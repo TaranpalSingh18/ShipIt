@@ -1,0 +1,10 @@
+fastapi
+pydantic
+uvicorn
+sqlalchemy
+psycopg2-binary ## important because SQLAlchemy needs a real POSTgresql driver to talk to the database
+pydantic[email]
+passlib
+argon2-cffi
+python-jose[cryptography]
+python-dotenv
