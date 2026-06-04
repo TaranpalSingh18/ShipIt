@@ -9,3 +9,5 @@ class Signup(BaseModel):
 class Login(BaseModel):
     email: EmailStr
     password: str = Field(min_length=4)
+
+

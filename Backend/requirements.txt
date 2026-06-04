@@ -8,3 +8,4 @@ passlib
 argon2-cffi
 python-jose[cryptography]
 python-dotenv
+python-multipart

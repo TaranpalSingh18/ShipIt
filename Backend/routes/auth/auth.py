@@ -2,7 +2,8 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Depends
-from schemas.auth import Signup, Login
+from fastapi.security import OAuth2PasswordRequestForm
+from schemas.auth import Signup
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from jose import jwt
@@ -48,13 +49,16 @@ def create_account(payload: Signup, db: Session = Depends(get_db)):
     return {"message":"new user has been created"}
 
 @auth.post('/login')
-def login_user(payload: Login, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email).first()
+def login_user(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.email == form_data.username).first()
 
     if not user:
         raise HTTPException(detail="User - Not found", status_code=400)
 
-    if not pwd_context.verify(payload.password, user.password):
+    if not pwd_context.verify(form_data.password, user.password):
         raise HTTPException(detail="Invalid credentials", status_code=400)
 
     access_token = create_access_token({"sub": user.email})
