@@ -1,5 +1,5 @@
 from  pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, Any
 from fastapi import UploadFile, File
 
 class QueryRequest(BaseModel):
@@ -7,8 +7,6 @@ class QueryRequest(BaseModel):
     conversation_id: Optional[str] = None
 
 class QueryReponse(BaseModel):
-    user_email: EmailStr
-    query_response: str
-
-
+    user_email: str
+    query_response: Any
     
