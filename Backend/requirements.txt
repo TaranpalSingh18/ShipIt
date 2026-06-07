@@ -13,3 +13,4 @@ langchain
 langchain-community
 langchain-groq
 langgraph
+tavily-python
