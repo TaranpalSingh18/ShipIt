@@ -14,3 +14,4 @@ langchain-community
 langchain-groq
 langgraph
 tavily-python
+jinja2
