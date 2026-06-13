@@ -1,31 +1,47 @@
-from fastapi import  APIRouter
-from fastapi.responses import PlainTextResponse
-from pathlib import Path
-from jinja2 import Environment, FileSystemLoader
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse, PlainTextResponse
 
-teardown = APIRouter(tags=["teardonw"], prefix="/teardown")
+from schemas.query_schema import QueryRequest
+from ..query.query import ProductQuestions
 
-BASE_DIR = Path(__file__).parent
+from ..query.query import run_product_pipeline
+from .builder import TeardownBuilder
+from .renderer import TeardownRenderer
 
-environ = Environment(loader=FileSystemLoader(BASE_DIR / "template"))
+teardown = APIRouter(tags=["teardown"], prefix="/teardown")
 
-@teardown.get('/')
-async def get_template():
-    data = {
-        "product_name": "Interview Coach AI",
-        "overview": "AI-powered interview preparation platform.",
-        "target_users": [
-            "College Students",
-            "Job Seekers"
-        ],
-        "pain_points": [
-            "Lack of feedback",
-            "No realistic mock interviews"
-        ]
+builder = TeardownBuilder()
+renderer = TeardownRenderer()
+
+
+def build_initial_state(user_query: str) -> ProductQuestions:
+    return {
+        "user_query": user_query,
+        "fully_answered": False,
+        "follow_up_questions": [],
+        "question_mapping": {},
+        "product_context": "",
+        "market_search_query": "",
+        "market_analysis": [],
     }
 
-    template = environ.get_template("teardown.j2")
 
-    rendered = template.render(**data)
+@teardown.post("/")
+async def generate_teardown(payload: QueryRequest):
+    state = build_initial_state(payload.user_query)
+    questions = run_product_pipeline(state)
 
-    return PlainTextResponse(rendered)
+    if not questions["fully_answered"]:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "needs_more_info",
+                "follow_up_questions": questions["follow_up_questions"],
+                "question_mapping": questions["question_mapping"],
+            },
+        )
+
+    teardown_data = builder.build(questions)
+    markdown = renderer.render(teardown_data)
+
+    return PlainTextResponse(markdown)
