@@ -3,6 +3,7 @@ from typing import Optional, Any
 from fastapi import UploadFile, File
 
 class QueryRequest(BaseModel):
+    project_id: int
     user_query: str
     conversation_id: Optional[str] = None
 

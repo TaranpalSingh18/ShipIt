@@ -7,7 +7,6 @@ import json
 import os
 from dotenv import load_dotenv
 from tavily import TavilyClient
-
 from db import get_db
 from models.user import User
 from routes.auth.auth import ALGORITHM, SECRET_KEY
