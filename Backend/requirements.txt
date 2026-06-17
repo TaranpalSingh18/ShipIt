@@ -15,3 +15,5 @@ langchain-groq
 langgraph
 tavily-python
 jinja2
+fpdf2
+markdown
