@@ -1,68 +1,102 @@
 # {{ product_name }}
 
+---
+
 ## One-Liner
 
 {{ one_liner }}
+
+---
 
 ## Executive Summary
 
 {{ executive_summary }}
 
+---
+
 ## Target Users
 
 {% for user in target_users %}
 - {{ user }}
+
 {% endfor %}
+
+---
 
 ## Pain Points
 
 {% for point in pain_points %}
 - {{ point }}
+
 {% endfor %}
+
+---
 
 ## Core Features
 
 {% for feature in core_features %}
 - {{ feature }}
+
 {% endfor %}
+
+---
 
 ## User Journey
 
 {% for step in user_journey %}
-- {{ step }}
+{% if loop.first %}{{ step }}{% else %}{{ step }}{% endif %}
+
 {% endfor %}
+
+---
 
 ## Competitors
 
 {% for competitor in competitors %}
 - **{{ competitor.name }}**: {{ competitor.why_competes }}
+
 {% endfor %}
+
+---
 
 ## Market Positioning
 
 {{ market_positioning }}
 
+---
+
 ## Business Model
 
 {{ business_model }}
+
+---
 
 ## Moats
 
 {% for moat in moats %}
 - {{ moat }}
+
 {% endfor %}
+
+---
 
 ## Opportunities
 
 {% for opportunity in opportunities %}
 - {{ opportunity }}
+
 {% endfor %}
+
+---
 
 ## Risks
 
 {% for risk in risks %}
 - {{ risk }}
+
 {% endfor %}
+
+---
 
 ## Verdict
 
