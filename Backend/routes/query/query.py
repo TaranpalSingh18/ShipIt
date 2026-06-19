@@ -8,8 +8,9 @@ import os
 from dotenv import load_dotenv
 from tavily import TavilyClient
 from db import get_db
-from models.user import User
+from models.user import User, Project
 from routes.auth.auth import ALGORITHM, SECRET_KEY
+from routes.customer.voice_analysis import generate_customer_voice
 from schemas.query_schema import QueryReponse, QueryRequest
 from langchain_groq.chat_models import ChatGroq
 
@@ -32,6 +33,7 @@ class ProductQuestions(TypedDict):
     product_context: str
     market_search_query: str
     market_analysis: list[dict[str, str]]
+    customer_voice: dict[str, Any]
 
 
 QUESTIONS = {
@@ -354,6 +356,7 @@ def run_product_pipeline(state: ProductQuestions) -> ProductQuestions:
         state["product_context"] = ""
         state["market_search_query"] = ""
         state["market_analysis"] = []
+        state["customer_voice"] = {}
         return state
 
     try:
@@ -371,7 +374,30 @@ def run_product_pipeline(state: ProductQuestions) -> ProductQuestions:
     except Exception:
         state["market_analysis"] = []
 
+    try:
+        state["customer_voice"] = generate_customer_voice(
+            state["product_context"],
+            state["market_analysis"],
+        )
+    except Exception:
+        state["customer_voice"] = {}
+
     return state
+
+
+def persist_project_state(project_id: int, state: ProductQuestions, db: Session) -> None:
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        return
+
+    project.latest_query = state["user_query"]
+    project.question_mapping = state["question_mapping"]
+    project.follow_up_questions = state["follow_up_questions"]
+    project.product_context = state["product_context"]
+    project.market_search_query = state["market_search_query"]
+    project.market_analysis = state["market_analysis"]
+    project.customer_voice = state.get("customer_voice") or {}
+    db.commit()
 
 
 def get_current_user(
@@ -403,6 +429,7 @@ def get_current_user(
 def get_query(
     payload: QueryRequest,
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     state: ProductQuestions = {
         "user_query": payload.user_query,
@@ -412,9 +439,11 @@ def get_query(
         "product_context": "",
         "market_search_query": "",
         "market_analysis": [],
+        "customer_voice": {},
     }
 
     result = run_product_pipeline(state)
+    persist_project_state(payload.project_id, result, db)
 
     return QueryReponse(
         user_email=current_user.email,

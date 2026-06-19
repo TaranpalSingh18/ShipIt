@@ -59,6 +59,59 @@
 
 ---
 
+## What Customers Use Today
+
+{% for solution in customer_voice.current_solutions %}
+- {{ solution }}
+
+{% else %}
+- Evidence on current solutions is limited from available research.
+
+{% endfor %}
+
+---
+
+## Competitor Satisfaction
+
+{% for sentiment in customer_voice.competitor_sentiment %}
+- **{{ sentiment.name }}** ({{ sentiment.satisfaction_summary }}): {{ sentiment.what_users_use }}
+{% for complaint in sentiment.common_complaints %}
+  - Complaint: {{ complaint }}
+{% endfor %}
+
+{% else %}
+- Competitor satisfaction data was not available from research.
+
+{% endfor %}
+
+---
+
+## Market Gaps
+
+{% for gap in customer_voice.market_gaps %}
+- **{{ gap.gap }}**: {{ gap.evidence }} — Opportunity: {{ gap.product_opportunity }}
+
+{% else %}
+- No specific market gaps were identified from available evidence.
+
+{% endfor %}
+
+---
+
+## How This Product Closes the Gap
+
+{% for feature in customer_voice.recommended_features %}
+- {{ feature }}
+
+{% else %}
+{% for feature in core_features %}
+- {{ feature }}
+
+{% endfor %}
+{% endfor %}
+
+---
+
 ## Market Positioning
 
 {{ market_positioning }}

@@ -1,5 +1,5 @@
 import uuid
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from schemas.query_schema import QueryRequest
@@ -25,7 +25,21 @@ def build_initial_state(user_query: str) -> ProductQuestions:
         "product_context": "",
         "market_search_query": "",
         "market_analysis": [],
+        "customer_voice": {},
     }
+
+
+def _build_teardown_markdown(questions: ProductQuestions) -> tuple[str, str]:
+    try:
+        teardown_data = builder.build(questions)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Teardown generation failed: {exc}",
+        ) from exc
+
+    markdown = renderer.render(teardown_data)
+    return teardown_data.product_name, markdown
 
 
 @teardown.post("/")
@@ -43,9 +57,7 @@ async def generate_teardown(payload: QueryRequest):
             },
         )
 
-    teardown_data = builder.build(questions)
-    markdown = renderer.render(teardown_data)
-
+    product_name, markdown = _build_teardown_markdown(questions)
     return PlainTextResponse(markdown)
 
 
@@ -75,12 +87,9 @@ async def generate_teardown_pdf(payload: QueryRequest):
             },
         )
 
-    # Generate teardown
-    teardown_data = builder.build(questions)
-    markdown = renderer.render(teardown_data)
+    product_name, markdown = _build_teardown_markdown(questions)
 
-    # Generate a unique filename
-    safe_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in teardown_data.product_name).strip().replace(" ", "_")
+    safe_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in product_name).strip().replace(" ", "_")
     if not safe_name:
         safe_name = "product_teardown"
     unique_id = uuid.uuid4().hex[:8]
@@ -93,7 +102,7 @@ async def generate_teardown_pdf(payload: QueryRequest):
         status_code=200,
         content={
             "status": "success",
-            "product_name": teardown_data.product_name,
+            "product_name": product_name,
             "pdf_filename": filename,
             "pdf_path": str(pdf_path),
             "download_url": f"/teardown/download/{filename}",

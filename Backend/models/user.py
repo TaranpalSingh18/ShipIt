@@ -39,6 +39,8 @@ class Project(Base):
 
     market_analysis = Column(JSON)
 
+    customer_voice = Column(JSON)
+
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now()
