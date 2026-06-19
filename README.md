@@ -38,6 +38,7 @@ Drop in a product idea → ShipIt runs it through **4 research phases**, then ge
 
 Output is available as **Markdown** (Jinja2 template) and a **professionally styled PDF** (fpdf2) with cover page, auto-generated table of contents, and branded sections.
 
+![Architecture Diagram](Backend/output/arch.png)
 ---
 
 ## Quick Start
