@@ -31,7 +31,7 @@ Drop in a product idea → ShipIt runs it through **4 research phases**, then ge
 
 3. **Customer Voice & Gap Analysis** — For each competitor, ShipIt researches what customers use, whether they're satisfied, and where the gaps are:
    - **Tavily** (always): per-competitor review and complaint search
-   - **Apify** (optional): deeper forum/review scraping for top 3 competitors when `APIFY_API_KEY` is set
+   - **Apify** (optional): deeper forum/review scraping when `VOICE_USE_APIFY=true` and `APIFY_API_KEY` is set (off by default for speed)
    - Output is structured as `CustomerVoiceAnalysis`: current solutions, competitor sentiment, market gaps, and recommended features
 
 4. **Teardown Report** — With full product context, market intel, and customer voice, a structured LLM call (Groq LLaMA 3.3 70B) generates a `ProductTeardown` object validated via Pydantic. Features and opportunities are **gap-driven** — tied to real competitor dissatisfaction, not generic founder assumptions.
@@ -59,9 +59,14 @@ GROQ_API_KEY="gsk_your_key"
 TAVILY_API_KEY="tvly-your_key"
 SECRET_KEY="your-jwt-secret"          # optional, defaults to "change-me"
 
-# Optional — enables deeper customer voice research for top 3 competitors
+# Optional — deeper research (slow). Requires APIFY_API_KEY + VOICE_USE_APIFY=true
 APIFY_API_KEY="apify_api_your_key"
+VOICE_USE_APIFY="false"
+VOICE_COMPETITOR_LIMIT="3"
+TAVILY_VOICE_MAX_RESULTS="3"
 ```
+
+See [`Backend/FLOW.md`](Backend/FLOW.md) for a beginner-friendly walkthrough of every file and how data flows through the pipeline.
 
 ### 3. Run the server
 

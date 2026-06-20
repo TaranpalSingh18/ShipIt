@@ -1,5 +1,6 @@
 import json
 import os
+from typing import TYPE_CHECKING
 
 from langchain_groq import ChatGroq
 from pydantic import ValidationError
@@ -9,6 +10,9 @@ from schemas.teardown import ProductTeardown, CustomerVoiceAnalysis
 
 from .normalizer import parse_teardown_llm_output
 from .prompts import TEARDOWN_JSON_PROMPT
+
+if TYPE_CHECKING:
+    from timing import PipelineTimer
 
 
 class TeardownBuilder:
@@ -29,7 +33,11 @@ class TeardownBuilder:
         content = getattr(response, "content", str(response))
         return parse_teardown_llm_output(content, market_analysis)
 
-    def build(self, questions: ProductQuestions) -> ProductTeardown:
+    def build(
+        self,
+        questions: ProductQuestions,
+        timer: "PipelineTimer | None" = None,
+    ) -> ProductTeardown:
         customer_voice_data = questions.get("customer_voice") or {}
         market_analysis = questions.get("market_analysis") or []
 
@@ -44,10 +52,15 @@ class TeardownBuilder:
             customer_voice=json.dumps(customer_voice_data, indent=2),
         )
 
+        if timer:
+            timer.start_phase("phase5_teardown_llm")
+
         try:
             llm_output = self._invoke_and_parse(prompt, market_analysis)
         except (ValidationError, ValueError, json.JSONDecodeError) as first_error:
             print("Teardown parse failed, retrying once:", repr(first_error))
+            if timer:
+                timer.start_phase("phase5_teardown_llm_retry")
             retry_prompt = (
                 prompt
                 + "\n\nIMPORTANT: Return ONLY one valid JSON object. "
