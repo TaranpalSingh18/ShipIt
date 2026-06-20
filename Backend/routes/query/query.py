@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
-from typing import TypedDict, Any
+from typing import TypedDict, Any, NotRequired
 import json
 import os
 from dotenv import load_dotenv
@@ -13,6 +13,7 @@ from routes.auth.auth import ALGORITHM, SECRET_KEY
 from routes.customer.voice_analysis import generate_customer_voice
 from schemas.query_schema import QueryReponse, QueryRequest
 from langchain_groq.chat_models import ChatGroq
+from timing import PipelineTimer
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
@@ -34,6 +35,7 @@ class ProductQuestions(TypedDict):
     market_search_query: str
     market_analysis: list[dict[str, str]]
     customer_voice: dict[str, Any]
+    pipeline_timing: NotRequired[dict[str, Any]]
 
 
 QUESTIONS = {
@@ -301,16 +303,24 @@ def get_tavily_results(search_query: str) -> dict[str, Any]:
         return {}
 
 
-def generate_market_analysis(product_context: str, search_query: str = "") -> list[dict[str, str]]:
+def generate_market_analysis(
+    product_context: str,
+    search_query: str = "",
+    timer: PipelineTimer | None = None,
+) -> list[dict[str, str]]:
     if not product_context:
         return []
 
+    if timer:
+        timer.start_phase("phase3_market_tavily_search")
     tavily_results = get_tavily_results(search_query or product_context)
     print(tavily_results)
 
     if not tavily_results:
         return []
 
+    if timer:
+        timer.start_phase("phase3_market_llm_competitors")
     prompt = build_market_prompt(product_context, tavily_results)
 
     try:
@@ -349,7 +359,16 @@ def generate_market_analysis(product_context: str, search_query: str = "") -> li
         return []
 
 
-def run_product_pipeline(state: ProductQuestions) -> ProductQuestions:
+def run_product_pipeline(
+    state: ProductQuestions,
+    timer: PipelineTimer | None = None,
+    finalize_timer: bool = True,
+) -> ProductQuestions:
+    owns_timer = timer is None
+    if timer is None:
+        timer = PipelineTimer(label="product_pipeline")
+
+    timer.start_phase("phase1_product_discovery")
     state = analyze_product_answers(state)
 
     if not state["fully_answered"]:
@@ -357,19 +376,24 @@ def run_product_pipeline(state: ProductQuestions) -> ProductQuestions:
         state["market_search_query"] = ""
         state["market_analysis"] = []
         state["customer_voice"] = {}
+        if finalize_timer or owns_timer:
+            state["pipeline_timing"] = timer.finish()
         return state
 
     try:
+        timer.start_phase("phase2_product_context")
         state["product_context"] = generate_product_context(state["question_mapping"])
     except Exception:
         state["product_context"] = ""
 
+    timer.start_phase("phase2_build_market_query")
     state["market_search_query"] = build_market_search_query(state["question_mapping"])
 
     try:
         state["market_analysis"] = generate_market_analysis(
             state["product_context"],
             state["market_search_query"],
+            timer=timer,
         )
     except Exception:
         state["market_analysis"] = []
@@ -378,10 +402,13 @@ def run_product_pipeline(state: ProductQuestions) -> ProductQuestions:
         state["customer_voice"] = generate_customer_voice(
             state["product_context"],
             state["market_analysis"],
+            timer=timer,
         )
     except Exception:
         state["customer_voice"] = {}
 
+    if finalize_timer or owns_timer:
+        state["pipeline_timing"] = timer.finish()
     return state
 
 
