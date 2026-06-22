@@ -2,6 +2,7 @@ fastapi
 pydantic
 uvicorn
 sqlalchemy
+alembic
 psycopg2-binary ## important because SQLAlchemy needs a real POSTgresql driver to talk to the database
 pydantic[email]
 passlib

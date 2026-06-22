@@ -1,11 +1,19 @@
 import uuid
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse, PlainTextResponse
+from sqlalchemy.orm import Session
 
+from db import get_db
+from models.user import User
 from schemas.query_schema import QueryRequest
-from ..query.query import ProductQuestions
-
-from ..query.query import run_product_pipeline
+from schemas.teardown import ProductTeardown
+from ..query.query import (
+    ProductQuestions,
+    build_pipeline_state_from_request,
+    get_current_user,
+    persist_project_state,
+    run_product_pipeline,
+)
 from .builder import TeardownBuilder
 from .renderer import TeardownRenderer
 from .pdf_generator import md_to_pdf, OUTPUT_DIR
@@ -17,23 +25,10 @@ builder = TeardownBuilder()
 renderer = TeardownRenderer()
 
 
-def build_initial_state(user_query: str) -> ProductQuestions:
-    return {
-        "user_query": user_query,
-        "fully_answered": False,
-        "follow_up_questions": [],
-        "question_mapping": {},
-        "product_context": "",
-        "market_search_query": "",
-        "market_analysis": [],
-        "customer_voice": {},
-    }
-
-
 def _build_teardown_markdown(
     questions: ProductQuestions,
     timer: PipelineTimer | None = None,
-) -> tuple[str, str]:
+) -> tuple[str, str, ProductTeardown]:
     try:
         teardown_data = builder.build(questions, timer=timer)
     except Exception as exc:
@@ -45,14 +40,34 @@ def _build_teardown_markdown(
     if timer:
         timer.start_phase("phase6_markdown_render")
     markdown = renderer.render(teardown_data)
-    return teardown_data.product_name, markdown
+    return teardown_data.product_name, markdown, teardown_data
+
+
+def _run_pipeline_for_request(
+    payload: QueryRequest,
+    current_user: User,
+    db: Session,
+    request_timer: PipelineTimer,
+) -> ProductQuestions:
+    state = build_pipeline_state_from_request(
+        payload.project_id,
+        payload.user_query,
+        current_user.id,
+        db,
+    )
+    questions = run_product_pipeline(state, timer=request_timer, finalize_timer=False)
+    persist_project_state(payload.project_id, current_user.id, questions, db)
+    return questions
 
 
 @teardown.post("/")
-async def generate_teardown(payload: QueryRequest):
+async def generate_teardown(
+    payload: QueryRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     request_timer = PipelineTimer(label="teardown_markdown_request")
-    state = build_initial_state(payload.user_query)
-    questions = run_product_pipeline(state, timer=request_timer, finalize_timer=False)
+    questions = _run_pipeline_for_request(payload, current_user, db, request_timer)
 
     if not questions["fully_answered"]:
         timing = request_timer.finish()
@@ -66,7 +81,7 @@ async def generate_teardown(payload: QueryRequest):
             },
         )
 
-    product_name, markdown = _build_teardown_markdown(questions, timer=request_timer)
+    product_name, markdown, _ = _build_teardown_markdown(questions, timer=request_timer)
     timing = request_timer.finish()
     print(f"[TIMING] Teardown markdown ready for: {product_name}")
 
@@ -76,14 +91,17 @@ async def generate_teardown(payload: QueryRequest):
 
 
 @teardown.post("/generate-pdf")
-async def generate_teardown_pdf(payload: QueryRequest):
+async def generate_teardown_pdf(
+    payload: QueryRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
     Generate a full product teardown and save it as a PDF to the
-    Backend/output/ directory.
+    Backend/output/ directory. Requires JWT authentication.
     """
     request_timer = PipelineTimer(label="teardown_pdf_request")
-    state = build_initial_state(payload.user_query)
-    questions = run_product_pipeline(state, timer=request_timer, finalize_timer=False)
+    questions = _run_pipeline_for_request(payload, current_user, db, request_timer)
 
     if not questions["fully_answered"]:
         timing = request_timer.finish()
@@ -97,7 +115,7 @@ async def generate_teardown_pdf(payload: QueryRequest):
             },
         )
 
-    product_name, markdown = _build_teardown_markdown(questions, timer=request_timer)
+    product_name, markdown, teardown_data = _build_teardown_markdown(questions, timer=request_timer)
 
     request_timer.start_phase("phase6_pdf_generation")
     safe_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in product_name).strip().replace(" ", "_")
@@ -106,7 +124,7 @@ async def generate_teardown_pdf(payload: QueryRequest):
     unique_id = uuid.uuid4().hex[:8]
     filename = f"{safe_name}_{unique_id}.pdf"
 
-    pdf_path = md_to_pdf(markdown, filename)
+    pdf_path = md_to_pdf(markdown, filename, teardown=teardown_data)
     timing = request_timer.finish()
 
     return JSONResponse(

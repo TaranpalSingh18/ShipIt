@@ -1,104 +1,40 @@
 # {{ product_name }}
 
----
-
-## One-Liner
+## Elevator Pitch
 
 {{ one_liner }}
-
----
 
 ## Executive Summary
 
 {{ executive_summary }}
 
----
-
-## Target Users
-
-{% for user in target_users %}
-- {{ user }}
-
-{% endfor %}
-
----
-
-## Pain Points
+## The Problem We Solve
 
 {% for point in pain_points %}
 - {{ point }}
 
 {% endfor %}
 
----
+## Target Customers
 
-## Core Features
-
-{% for feature in core_features %}
-- {{ feature }}
+{% for user in target_users %}
+- {{ user }}
 
 {% endfor %}
 
----
-
-## User Journey
-
-{% for step in user_journey %}
-{% if loop.first %}{{ step }}{% else %}{{ step }}{% endif %}
-
-{% endfor %}
-
----
-
-## Competitors
-
-{% for competitor in competitors %}
-- **{{ competitor.name }}**: {{ competitor.why_competes }}
-
-{% endfor %}
-
----
-
-## What Customers Use Today
-
-{% for solution in customer_voice.current_solutions %}
-- {{ solution }}
-
-{% else %}
-- Evidence on current solutions is limited from available research.
-
-{% endfor %}
-
----
-
-## Competitor Satisfaction
-
-{% for sentiment in customer_voice.competitor_sentiment %}
-- **{{ sentiment.name }}** ({{ sentiment.satisfaction_summary }}): {{ sentiment.what_users_use }}
-{% for complaint in sentiment.common_complaints %}
-  - Complaint: {{ complaint }}
-{% endfor %}
-
-{% else %}
-- Competitor satisfaction data was not available from research.
-
-{% endfor %}
-
----
-
-## Market Gaps
+## Market Gaps & White Space
 
 {% for gap in customer_voice.market_gaps %}
-- **{{ gap.gap }}**: {{ gap.evidence }} — Opportunity: {{ gap.product_opportunity }}
+- **Gap:** {{ gap.gap }}
+- **Evidence:** {{ gap.evidence }}
+- **Our Angle:** {{ gap.product_opportunity }}
 
 {% else %}
-- No specific market gaps were identified from available evidence.
+- Market gap analysis is limited — validate with customer interviews before investing.
 
 {% endfor %}
 
----
-
-## How This Product Closes the Gap
+## Product Overview
 
 {% for feature in customer_voice.recommended_features %}
 - {{ feature }}
@@ -110,47 +46,49 @@
 {% endfor %}
 {% endfor %}
 
----
+## User Journey
+
+{% for step in user_journey %}
+{{ loop.index }}. {{ step }}
+
+{% endfor %}
+
+## Key Competitors
+
+{% for competitor in competitors %}
+- **{{ competitor.name }}** — {{ competitor.why_competes }}
+
+{% endfor %}
 
 ## Market Positioning
 
 {{ market_positioning }}
 
----
-
 ## Business Model
 
 {{ business_model }}
 
----
-
-## Moats
+## Competitive Moats
 
 {% for moat in moats %}
 - {{ moat }}
 
 {% endfor %}
 
----
-
-## Opportunities
+## Growth Opportunities
 
 {% for opportunity in opportunities %}
 - {{ opportunity }}
 
 {% endfor %}
 
----
-
-## Risks
+## Key Risks
 
 {% for risk in risks %}
 - {{ risk }}
 
 {% endfor %}
 
----
-
-## Verdict
+## Final Recommendation
 
 {{ verdict }}

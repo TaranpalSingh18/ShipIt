@@ -165,10 +165,10 @@ For production scale, this cache moves to **Redis** (Step 5 in the scaling roadm
 
 | Needs login? | Endpoints |
 |--------------|-----------|
-| Yes | `/api/query` |
-| No (today) | `/teardown/*`, `/api/signup`, `/api/login` |
+| Yes | `/api/query`, `/api/projects`, `/teardown/`, `/teardown/generate-pdf` |
+| No | `/api/signup`, `/api/login`, `/teardown/download/{filename}`, `/behaviour/debug` |
 
-**Scaling note:** Teardown should require auth before going public (Step 2 of roadmap) — otherwise anyone can burn your API credits.
+**Scaling note:** Teardown routes now require JWT so strangers cannot burn your API credits.
 
 ---
 

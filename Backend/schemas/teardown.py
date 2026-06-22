@@ -45,6 +45,10 @@ class CustomerVoiceAnalysis(BaseModel):
 class CompetitorItem(BaseModel):
     name: str = Field(..., description="Competitor name (e.g. 'Pramp')")
     why_competes: str = Field(..., description="Full sentence explaining why this competitor is relevant to the product being analyzed")
+    website: str = Field(
+        default="",
+        description="Company domain for logo display, e.g. 'stripe.com' — leave empty if unknown",
+    )
 
 
 class ProductTeardownLLMOutput(BaseModel):

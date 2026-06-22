@@ -1,8 +1,9 @@
 TEARDOWN_PROMPT = """
-You are a senior product strategist, startup analyst, and teardown writer.
+You are a senior startup analyst writing an investor-facing product teardown memo.
 
-Your job is to produce a sharp, insightful, investor-style product teardown using ONLY the provided evidence.
-Do not invent facts, metrics, funding, market size, or product capabilities that are not supported by the inputs.
+Your audience: angel investors and pre-seed VCs reading a ONE-PAGE investment snapshot.
+Tone: confident, crisp, evidence-backed — like a top-tier VC associate memo, not a school essay.
+Every field must be SHORT. The PDF fits everything on a single page.
 
 INPUTS
 - User Query: {user_query}
@@ -14,23 +15,51 @@ INPUTS
 - Market Analysis: {market_analysis}
 - Customer Voice: {customer_voice}
 
-GUIDELINES
-- Be thorough and detailed. Write substantial content, not brief notes.
-- executive_summary: write 2-3 detailed paragraphs.
-- market_positioning and business_model: write one thorough paragraph each.
-- verdict: write 1-2 paragraphs with clear reasoning.
-- For list fields (target_users, pain_points, core_features, user_journey, moats, opportunities, risks), each item should be a detailed sentence or short paragraph describing one distinct item.
-- For competitors, each item should include the competitor name and a full sentence explaining why they compete. Note satisfaction weaknesses from Customer Voice when evidence exists.
-- pain_points: must reference real competitor complaints from Customer Voice when available.
-- core_features: must map to market_gaps and recommended_features from Customer Voice — gap-driven features, not generic ideas.
-- opportunities: must cite underserved needs found in Customer Voice sentiment data.
-- Use specific, concrete language. Name real user segments, real pain points, real scenarios.
-- If evidence is thin, say that clearly instead of fabricating detail.
-- Use the market analysis and customer voice to justify competitors, positioning, risks, and opportunities.
-- Make the teardown feel like it was written by a product lead reviewing a real product.
-- Keep each field non-redundant — do not repeat the same point across different fields.
+INVESTOR MEMO GUIDELINES
 
-Write with strong product judgment, not marketing fluff.
+one_liner:
+- Write a punchy elevator pitch (max 25 words). Format: "[Product] helps [who] [ achieve outcome ] by [how]."
+
+executive_summary:
+- MAX 3 sentences (~75 words total). Problem + solution + why invest now.
+- Use concrete language. No fluff words like "innovative" or "revolutionary" without evidence.
+
+target_users:
+- Exactly 2 bullets. Each = one segment in under 12 words.
+
+pain_points:
+- Exactly 3 bullets. Each = one sharp pain in under 15 words.
+
+core_features:
+- Exactly 3 bullets. Each = feature + benefit in under 15 words.
+
+user_journey:
+- Exactly 4 numbered steps. Each step = verb + action in under 10 words.
+
+competitors:
+- Exactly 3 objects with name, why_competes (max 15 words), and website (domain only, e.g. "shopify.com") when known; empty string if unknown.
+
+market_positioning:
+- MAX 2 sentences (~40 words): category, differentiation, niche.
+
+business_model:
+- MAX 2 sentences (~40 words): pricing, who pays, scale path.
+
+moats:
+- Exactly 2 bullets, max 12 words each.
+
+opportunities:
+- Exactly 2 bullets, max 12 words each.
+
+risks:
+- Exactly 2 bullets, max 12 words each.
+
+verdict:
+- MAX 2 sentences (~50 words). State judgment (Strong / Promising / Needs validation).
+- End with "Bottom line:" + one direct investor takeaway (max 15 words).
+
+Do not invent metrics, funding, or market size. If evidence is thin, say so clearly.
+Do not repeat the same point across fields.
 """
 
 TEARDOWN_JSON_PROMPT = (
@@ -48,21 +77,21 @@ Do NOT use strings for list fields. Do NOT duplicate keys. Do NOT add extra keys
 Example shape:
 {{
   "product_name": "CampusMock AI",
-  "one_liner": "One sentence pitch.",
-  "executive_summary": "2-3 paragraphs as one string.",
-  "target_users": ["Segment one sentence.", "Segment two sentence."],
+  "one_liner": "AI mock interviews that help placement-season students land offers by simulating real campus hiring loops.",
+  "executive_summary": "Three paragraphs as one string.",
+  "target_users": ["Segment one.", "Segment two."],
   "pain_points": ["Pain one.", "Pain two."],
   "core_features": ["Feature one.", "Feature two."],
-  "user_journey": ["Step one.", "Step two.", "Step three."],
+  "user_journey": ["Discover the platform via campus ambassadors.", "Complete onboarding and skill assessment."],
   "competitors": [
-    {{"name": "Pramp", "why_competes": "Offers peer mock interviews for engineers."}}
+    {{"name": "Pramp", "why_competes": "Peer mock interviews for engineers; weak on behavioral rounds.", "website": "pramp.com"}}
   ],
   "market_positioning": "One paragraph.",
   "business_model": "One paragraph.",
   "moats": ["Moat one.", "Moat two."],
   "opportunities": ["Opportunity one.", "Opportunity two."],
   "risks": ["Risk one.", "Risk two."],
-  "verdict": "1-2 paragraphs as one string."
+  "verdict": "Two paragraphs ending with Bottom line: ..."
 }}
 """
 )
