@@ -85,6 +85,7 @@ def _competitors_from_market(market_analysis: list[dict[str, str]]) -> list[dict
                 {
                     "name": name,
                     "why_competes": why or "Competes in the same market segment.",
+                    "website": "",
                 }
             )
     return competitors
@@ -103,11 +104,13 @@ def _ensure_competitors(
                 why = str(
                     item.get("why_competes") or item.get("competitor_because") or ""
                 ).strip()
+                website = str(item.get("website") or item.get("domain") or "").strip()
                 if name:
                     competitors.append(
                         {
                             "name": name,
                             "why_competes": why or "Competes in the same market segment.",
+                            "website": website,
                         }
                     )
             elif isinstance(item, str) and item.strip():
@@ -115,6 +118,7 @@ def _ensure_competitors(
                     {
                         "name": item.strip(),
                         "why_competes": "Competes in the same market segment.",
+                        "website": "",
                     }
                 )
 

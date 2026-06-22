@@ -16,6 +16,11 @@ pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
 ALGORITHM = "HS256"
 
+if SECRET_KEY == "change-me" and os.getenv("ENV", "development") == "production":
+    raise RuntimeError("Set a strong SECRET_KEY before running in production.")
+elif SECRET_KEY == "change-me":
+    print("WARNING: Using default SECRET_KEY. Set SECRET_KEY in Backend/.env for production.")
+
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     token_data = data.copy()
