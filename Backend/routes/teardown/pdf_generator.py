@@ -411,7 +411,7 @@ class InvestorOnePager(FPDF):
             y_left = self.get_y() + 2
         y_left += pad_inner
 
-        # --- RIGHT: Business Case ---
+        # --- RIGHT: Business Case ----
         y_right = row2_top + pad_inner
         y_right = self._bar_heading("Business Case", self._col_x[1], y_right, self._col_w,
                                     bg=(20, 80, 50))
@@ -500,3 +500,5 @@ def md_to_pdf(
     filepath = OUTPUT_DIR / filename
     pdf.output(str(filepath))
     return filepath
+
+print("pdf_generated")
