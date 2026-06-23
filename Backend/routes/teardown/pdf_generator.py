@@ -500,3 +500,5 @@ def md_to_pdf(
     filepath = OUTPUT_DIR / filename
     pdf.output(str(filepath))
     return filepath
+
+print("pdf_generated")
