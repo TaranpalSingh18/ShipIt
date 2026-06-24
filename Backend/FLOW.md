@@ -186,10 +186,34 @@ For production scale, this cache moves to **Redis** (Step 5 in the scaling roadm
 | Problem | Where it shows up | Future fix |
 |---------|-------------------|------------|
 | Slow requests | Phase 4 Tavily | Cache (done in-memory), competitor cap (done) |
-| Timeouts | 37s+ PDF generation | Background job queue (Step 3) |
+| Timeouts | 37s+ PDF generation | Background job queue (Done: Celery + Redis) |
 | PDFs lost on redeploy | `output/` folder | S3 / cloud storage (Step 4) |
 | API abuse | Public teardown routes | Auth + rate limits (Step 2 + 5) |
 | One server limit | Single uvicorn process | Docker + multiple workers (Step 6) |
+
+---
+
+## Background Tasks (Celery + Redis)
+
+To handle long-running PDF generation without timing out the browser, we use Celery:
+
+1. **`celery_app.py`**: Configures the connection to Redis.
+2. **`tasks.py`**: Contains `generate_teardown_pdf_task`, which runs the full pipeline.
+3. **`routes/teardown/template.py`**:
+   - `POST /teardown/generate-pdf`: Now returns a `task_id` immediately.
+   - `GET /teardown/task/{task_id}`: Poll this to see if the PDF is ready.
+
+**To run the worker (Windows):**
+```bash
+cd Backend
+celery -A celery_app worker --loglevel=info -P solo
+```
+
+**To run the worker (Linux/Mac):**
+```bash
+cd Backend
+celery -A celery_app worker --loglevel=info
+```
 
 ---
 

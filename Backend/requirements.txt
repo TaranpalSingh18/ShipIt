@@ -19,3 +19,5 @@ jinja2
 fpdf2
 markdown
 langchain-apify
+celery
+redis
