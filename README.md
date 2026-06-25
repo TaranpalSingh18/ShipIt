@@ -31,7 +31,7 @@ Drop in a product idea → ShipIt runs it through **4 research phases**, then ge
 
 3. **Customer Voice & Gap Analysis** — For each competitor, ShipIt researches what customers use, whether they're satisfied, and where the gaps are:
    - **Tavily** (always): per-competitor review and complaint search
-   - **Apify** (optional): deeper forum/review scraping for top 3 competitors when `APIFY_API_KEY` is set
+   - **Apify** (optional): deeper forum/review scraping when `VOICE_USE_APIFY=true` and `APIFY_API_KEY` is set (off by default for speed)
    - Output is structured as `CustomerVoiceAnalysis`: current solutions, competitor sentiment, market gaps, and recommended features
 
 4. **Teardown Report** — With full product context, market intel, and customer voice, a structured LLM call (Groq LLaMA 3.3 70B) generates a `ProductTeardown` object validated via Pydantic. Features and opportunities are **gap-driven** — tied to real competitor dissatisfaction, not generic founder assumptions.
@@ -51,7 +51,7 @@ pip install -r Backend/requirements.txt
 
 ### 2. Configure environment
 
-Create `Backend/.env`:
+Create `Backend/.env` with your keys (see variables below).
 
 ```env
 DATABASE_URL="postgresql://user:pass@localhost:5432/shipit"
@@ -59,9 +59,14 @@ GROQ_API_KEY="gsk_your_key"
 TAVILY_API_KEY="tvly-your_key"
 SECRET_KEY="your-jwt-secret"          # optional, defaults to "change-me"
 
-# Optional — enables deeper customer voice research for top 3 competitors
+# Optional — deeper research (slow). Requires APIFY_API_KEY + VOICE_USE_APIFY=true
 APIFY_API_KEY="apify_api_your_key"
+VOICE_USE_APIFY="false"
+VOICE_COMPETITOR_LIMIT="3"
+TAVILY_VOICE_MAX_RESULTS="3"
 ```
+
+See [`Backend/FLOW.md`](Backend/FLOW.md) for a beginner-friendly walkthrough of every file and how data flows through the pipeline.
 
 ### 3. Run the server
 
@@ -73,12 +78,45 @@ uvicorn Backend.main:app --reload
 
 API docs: `http://localhost:8000/docs`
 
-### 4. Generate a PDF teardown
+### 4. Run database migrations (recommended)
+
+From `Backend/`:
+
+```bash
+cd Backend
+alembic upgrade head
+```
+
+For local dev only, you can skip Alembic and set `AUTO_CREATE_DB=true` in `.env` (default).
+
+### 5. Generate a PDF teardown
+
+First sign up, log in, and create a project:
+
+```bash
+# Signup
+curl -X POST http://localhost:8000/api/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","name":"You","password":"secret1234"}'
+
+# Login (save the access_token)
+curl -X POST http://localhost:8000/api/login \
+  -d "username=you@example.com&password=secret1234"
+
+# Create a project (save project_id)
+curl -X POST http://localhost:8000/api/projects \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"project_name":"My Idea"}'
+```
+
+Then generate the PDF (requires JWT):
 
 ```bash
 curl -X POST http://localhost:8000/teardown/generate-pdf \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"project_id\": 1, \"user_query\": \"AI mock interview platform for final-year engineering students preparing for campus placements. Target: college students in India. Pain: no realistic interview practice with actionable feedback. Frequency: every placement season. Current solutions: YouTube, LeetCode, peer mock interviews. Advantage: AI-generated questions, real-time evaluation, personalized improvement plan. Validation: 20 students expressed strong interest.\"}"
+  -d "{\"project_id\": 1, \"user_query\": \"AI mock interview platform for final-year engineering students...\"}"
 ```
 
 If discovery is incomplete, you'll get `follow_up_questions` back. Submit again with more context until you get the full report.
@@ -140,6 +178,8 @@ curl -O http://localhost:8000/teardown/download/CampusMock_AI_a1b2c3d4.pdf
 ```
 Backend/
 ├── main.py                         # FastAPI entrypoint — registers all routers
+├── alembic/                        # Database migrations (Alembic)
+│   └── versions/
 ├── db.py                           # PostgreSQL connection, session factory, Base
 ├── models/
 │   └── user.py                     # User & Project ORM models
@@ -176,10 +216,11 @@ Backend/
 |--------|----------|:----:|-------------|
 | `POST` | `/api/signup` | ❌ | Create account (email, name, password) |
 | `POST` | `/api/login` | ❌ | Login → returns JWT access token |
+| `POST` | `/api/projects` | ✅ | Create a project → returns `project_id` |
 | `POST` | `/api/query` | ✅ | Run full discovery pipeline (Phases 1–4); persists state to project |
 | `GET` | `/api/query` | ✅ | Verify auth status |
-| `POST` | `/teardown/` | ❌ | Full teardown → Markdown |
-| `POST` | `/teardown/generate-pdf` | ❌ | Full teardown → PDF file in `Backend/output/` |
+| `POST` | `/teardown/` | ✅ | Full teardown → Markdown |
+| `POST` | `/teardown/generate-pdf` | ✅ | Full teardown → PDF file in `Backend/output/` |
 | `GET` | `/teardown/download/{filename}` | ❌ | Download a generated PDF |
 | `POST` | `/behaviour/debug` | ❌ | Dev-only: test customer voice for one competitor |
 
@@ -252,13 +293,20 @@ The generated investor-ready PDF includes:
 
 ## Database Notes
 
-If upgrading an existing database, add the new column:
+**Alembic migrations** (from `Backend/`):
+
+```bash
+alembic upgrade head    # apply migrations
+alembic revision --autogenerate -m "describe change"  # after model changes
+```
+
+Set `AUTO_CREATE_DB=false` in production and use Alembic only.
+
+If upgrading an old database without Alembic history:
 
 ```sql
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS customer_voice JSON;
 ```
-
-`Base.metadata.create_all()` only creates new tables — it does not alter existing ones.
 
 ---
 

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
-from typing import TypedDict, Any
+from typing import TypedDict, Any, NotRequired
 import json
 import os
 from dotenv import load_dotenv
@@ -11,8 +11,14 @@ from db import get_db
 from models.user import User, Project
 from routes.auth.auth import ALGORITHM, SECRET_KEY
 from routes.customer.voice_analysis import generate_customer_voice
-from schemas.query_schema import QueryReponse, QueryRequest
+from schemas.query_schema import (
+    ProjectCreateRequest,
+    ProjectCreateResponse,
+    QueryReponse,
+    QueryRequest,
+)
 from langchain_groq.chat_models import ChatGroq
+from timing import PipelineTimer
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
@@ -34,6 +40,7 @@ class ProductQuestions(TypedDict):
     market_search_query: str
     market_analysis: list[dict[str, str]]
     customer_voice: dict[str, Any]
+    pipeline_timing: NotRequired[dict[str, Any]]
 
 
 QUESTIONS = {
@@ -301,16 +308,24 @@ def get_tavily_results(search_query: str) -> dict[str, Any]:
         return {}
 
 
-def generate_market_analysis(product_context: str, search_query: str = "") -> list[dict[str, str]]:
+def generate_market_analysis(
+    product_context: str,
+    search_query: str = "",
+    timer: PipelineTimer | None = None,
+) -> list[dict[str, str]]:
     if not product_context:
         return []
 
+    if timer:
+        timer.start_phase("phase3_market_tavily_search")
     tavily_results = get_tavily_results(search_query or product_context)
     print(tavily_results)
 
     if not tavily_results:
         return []
 
+    if timer:
+        timer.start_phase("phase3_market_llm_competitors")
     prompt = build_market_prompt(product_context, tavily_results)
 
     try:
@@ -349,7 +364,16 @@ def generate_market_analysis(product_context: str, search_query: str = "") -> li
         return []
 
 
-def run_product_pipeline(state: ProductQuestions) -> ProductQuestions:
+def run_product_pipeline(
+    state: ProductQuestions,
+    timer: PipelineTimer | None = None,
+    finalize_timer: bool = True,
+) -> ProductQuestions:
+    owns_timer = timer is None
+    if timer is None:
+        timer = PipelineTimer(label="product_pipeline")
+
+    timer.start_phase("phase1_product_discovery")
     state = analyze_product_answers(state)
 
     if not state["fully_answered"]:
@@ -357,19 +381,24 @@ def run_product_pipeline(state: ProductQuestions) -> ProductQuestions:
         state["market_search_query"] = ""
         state["market_analysis"] = []
         state["customer_voice"] = {}
+        if finalize_timer or owns_timer:
+            state["pipeline_timing"] = timer.finish()
         return state
 
     try:
+        timer.start_phase("phase2_product_context")
         state["product_context"] = generate_product_context(state["question_mapping"])
     except Exception:
         state["product_context"] = ""
 
+    timer.start_phase("phase2_build_market_query")
     state["market_search_query"] = build_market_search_query(state["question_mapping"])
 
     try:
         state["market_analysis"] = generate_market_analysis(
             state["product_context"],
             state["market_search_query"],
+            timer=timer,
         )
     except Exception:
         state["market_analysis"] = []
@@ -378,17 +407,67 @@ def run_product_pipeline(state: ProductQuestions) -> ProductQuestions:
         state["customer_voice"] = generate_customer_voice(
             state["product_context"],
             state["market_analysis"],
+            timer=timer,
         )
     except Exception:
         state["customer_voice"] = {}
 
+    if finalize_timer or owns_timer:
+        state["pipeline_timing"] = timer.finish()
     return state
 
 
-def persist_project_state(project_id: int, state: ProductQuestions, db: Session) -> None:
+def build_initial_state(user_query: str) -> ProductQuestions:
+    return {
+        "user_query": user_query,
+        "fully_answered": False,
+        "follow_up_questions": [],
+        "question_mapping": {},
+        "product_context": "",
+        "market_search_query": "",
+        "market_analysis": [],
+        "customer_voice": {},
+    }
+
+
+def get_user_project(project_id: int, user_id: int, db: Session) -> Project:
+    if project_id < 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid project_id. Create a project via POST /api/projects first.",
+        )
+
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
-        return
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this project")
+    return project
+
+
+def build_pipeline_state_from_request(
+    project_id: int,
+    user_query: str,
+    user_id: int,
+    db: Session,
+) -> ProductQuestions:
+    project = get_user_project(project_id, user_id, db)
+
+    combined_query = user_query.strip()
+    prior_query = (project.latest_query or "").strip()
+    if prior_query and prior_query != combined_query:
+        combined_query = f"{prior_query}\n\nAdditional context:\n{combined_query}"
+
+    return build_initial_state(combined_query)
+
+
+def persist_project_state(
+    project_id: int,
+    user_id: int,
+    state: ProductQuestions,
+    db: Session,
+) -> None:
+    project = get_user_project(project_id, user_id, db)
 
     project.latest_query = state["user_query"]
     project.question_mapping = state["question_mapping"]
@@ -425,25 +504,41 @@ def get_current_user(
     return user
 
 
+@query.post("/projects", response_model=ProjectCreateResponse)
+def create_project(
+    payload: ProjectCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = Project(
+        user_id=current_user.id,
+        project_name=payload.project_name or "Untitled",
+    )
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+
+    return ProjectCreateResponse(
+        project_id=project.id,
+        project_name=project.project_name,
+    )
+
+
 @query.post("/query", response_model=QueryReponse)
 def get_query(
     payload: QueryRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    state: ProductQuestions = {
-        "user_query": payload.user_query,
-        "fully_answered": False,
-        "follow_up_questions": [],
-        "question_mapping": {},
-        "product_context": "",
-        "market_search_query": "",
-        "market_analysis": [],
-        "customer_voice": {},
-    }
+    state = build_pipeline_state_from_request(
+        payload.project_id,
+        payload.user_query,
+        current_user.id,
+        db,
+    )
 
     result = run_product_pipeline(state)
-    persist_project_state(payload.project_id, result, db)
+    persist_project_state(payload.project_id, current_user.id, result, db)
 
     return QueryReponse(
         user_email=current_user.email,

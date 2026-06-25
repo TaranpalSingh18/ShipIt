@@ -1,8 +1,10 @@
 import json
 import os
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from functools import lru_cache
+from typing import Any, TYPE_CHECKING
 
 from dotenv import load_dotenv
 from langchain_apify import ApifyActorsTool
@@ -10,6 +12,9 @@ from langchain_groq import ChatGroq
 from tavily import TavilyClient
 
 from schemas.teardown import CustomerVoiceAnalysis
+
+if TYPE_CHECKING:
+    from timing import PipelineTimer
 
 load_dotenv()
 
@@ -19,6 +24,9 @@ apify_api_key = os.getenv("APIFY_API_KEY")
 
 MAX_WORKERS = min(8, (os.cpu_count() or 4) + 2)
 APIFY_DEEP_LIMIT = 3
+VOICE_COMPETITOR_LIMIT = int(os.getenv("VOICE_COMPETITOR_LIMIT", "3"))
+VOICE_USE_APIFY = os.getenv("VOICE_USE_APIFY", "false").lower() in ("1", "true", "yes")
+TAVILY_VOICE_MAX_RESULTS = int(os.getenv("TAVILY_VOICE_MAX_RESULTS", "3"))
 
 VOICE_SYNTHESIS_PROMPT = """
 You are a senior product researcher analyzing customer voice and market gaps.
@@ -73,26 +81,47 @@ def _run_in_parallel(fn, items: list) -> list:
         return list(pool.map(fn, items))
 
 
-def _tavily_competitor_search(competitor_name: str) -> dict[str, Any]:
+def _tavily_competitor_search_uncached(competitor_name: str) -> dict[str, Any]:
     if not tavily_api_key:
         return {}
 
     client = TavilyClient(api_key=tavily_api_key)
     query = f"{competitor_name} user reviews complaints problems reddit"
     try:
-        return client.search(query=query, max_results=5)
+        return client.search(query=query, max_results=TAVILY_VOICE_MAX_RESULTS)
     except Exception as e:
         print(f"Tavily voice search failed for {competitor_name}:", repr(e))
         return {}
 
 
+@lru_cache(maxsize=128)
+def _tavily_competitor_search_cached(competitor_name: str) -> str:
+    started = time.perf_counter()
+    result = _tavily_competitor_search_uncached(competitor_name)
+    elapsed = time.perf_counter() - started
+    print(f"[VOICE] Tavily fetch '{competitor_name}' ({elapsed:.2f}s)")
+    return json.dumps(result, sort_keys=True, default=str)
+
+
+def _tavily_competitor_search(competitor_name: str) -> dict[str, Any]:
+    cache_info_before = _tavily_competitor_search_cached.cache_info()
+    payload = _tavily_competitor_search_cached(competitor_name)
+    cache_info_after = _tavily_competitor_search_cached.cache_info()
+    if cache_info_after.hits > cache_info_before.hits:
+        print(f"[VOICE] Tavily cache HIT for '{competitor_name}'")
+    if not payload or payload == "{}":
+        return {}
+    return json.loads(payload)
+
+
 def _apify_deep_scrape(competitor_name: str, product_context: str) -> str:
-    if not apify_api_key:
+    if not apify_api_key or not VOICE_USE_APIFY:
         return ""
 
     context_snippet = product_context[:200].replace("\n", " ")
     query = f"{competitor_name} user reviews complaints alternatives {context_snippet}"
 
+    started = time.perf_counter()
     try:
         browser = ApifyActorsTool(
             "apify/rag-web-browser",
@@ -102,6 +131,8 @@ def _apify_deep_scrape(competitor_name: str, product_context: str) -> str:
     except Exception as e:
         print(f"Apify deep scrape failed for {competitor_name}:", repr(e))
         return ""
+    finally:
+        print(f"[VOICE] Apify scrape '{competitor_name}' ({time.perf_counter() - started:.2f}s)")
 
     markdown_sources: list[str] = []
     if isinstance(raw_data, list):
@@ -118,6 +149,7 @@ def _apify_deep_scrape(competitor_name: str, product_context: str) -> str:
 
 def _research_competitor(args: tuple[str, bool, str]) -> tuple[str, str]:
     competitor_name, use_apify, product_context = args
+    started = time.perf_counter()
     parts: list[str] = []
 
     tavily_results = _tavily_competitor_search(competitor_name)
@@ -129,6 +161,8 @@ def _research_competitor(args: tuple[str, bool, str]) -> tuple[str, str]:
         if apify_text:
             parts.append(f"APIFY:\n{apify_text}")
 
+    elapsed = time.perf_counter() - started
+    print(f"[VOICE] Research done '{competitor_name}' total={elapsed:.2f}s apify={use_apify}")
     return competitor_name, "\n\n".join(parts) if parts else "No research evidence found."
 
 
@@ -136,25 +170,49 @@ def _empty_customer_voice() -> dict[str, Any]:
     return CustomerVoiceAnalysis().model_dump()
 
 
+def _cap_competitors(competitors: list[str]) -> list[str]:
+    if len(competitors) <= VOICE_COMPETITOR_LIMIT:
+        return competitors
+
+    print(
+        f"[VOICE] Capping competitor research from {len(competitors)} "
+        f"to {VOICE_COMPETITOR_LIMIT} (set VOICE_COMPETITOR_LIMIT to change)"
+    )
+    return competitors[:VOICE_COMPETITOR_LIMIT]
+
+
 def generate_customer_voice(
     product_context: str,
     market_analysis: list[dict[str, str]],
+    timer: "PipelineTimer | None" = None,
 ) -> dict[str, Any]:
     if not product_context or not market_analysis:
         return _empty_customer_voice()
 
-    competitors = [
+    competitors = _cap_competitors([
         str(item.get("comp_name", "")).strip()
         for item in market_analysis
         if isinstance(item, dict) and str(item.get("comp_name", "")).strip()
-    ]
+    ])
     if not competitors:
         return _empty_customer_voice()
 
+    if VOICE_USE_APIFY:
+        print(f"[VOICE] Apify deep scrape ENABLED for top {APIFY_DEEP_LIMIT} competitors")
+    else:
+        print("[VOICE] Apify disabled (fast mode). Set VOICE_USE_APIFY=true for deeper research.")
+
     research_args = [
-        (name, apify_api_key is not None and idx < APIFY_DEEP_LIMIT, product_context)
+        (
+            name,
+            VOICE_USE_APIFY and apify_api_key is not None and idx < APIFY_DEEP_LIMIT,
+            product_context,
+        )
         for idx, name in enumerate(competitors)
     ]
+
+    if timer:
+        timer.start_phase("phase4_voice_competitor_research")
 
     worker_count = min(len(research_args), MAX_WORKERS)
     with ThreadPoolExecutor(max_workers=worker_count) as pool:
@@ -169,6 +227,9 @@ def generate_customer_voice(
     if not groq_api_key:
         print("GROQ_API_KEY is missing; skipping customer voice synthesis")
         return _empty_customer_voice()
+
+    if timer:
+        timer.start_phase("phase4_voice_llm_synthesis")
 
     try:
         llm = ChatGroq(
