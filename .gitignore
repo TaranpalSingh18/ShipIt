@@ -4,3 +4,5 @@ __pycache__
 venv/
 node_modules/
 dist/
+Backend/output/
+Backend/assets/logo_cache/

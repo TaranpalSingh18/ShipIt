@@ -1,0 +1,463 @@
+.ws {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 48px;
+  padding-top: 36px;
+  padding-bottom: 120px;
+  align-items: start;
+}
+.ws-loading {
+  min-height: 50vh;
+  display: grid;
+  place-items: center;
+}
+.back {
+  font-size: 13.5px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.back::before {
+  content: '← ';
+}
+.back:hover {
+  color: var(--text);
+}
+.ws-head h1,
+.name-field input {
+  font-size: clamp(36px, 5vw, 54px);
+  margin-top: 12px;
+}
+.name-field input {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed var(--line-2);
+  padding: 0 0 6px;
+  font-family: var(--serif);
+  font-weight: 560;
+  color: var(--text);
+}
+.name-field input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+.name-field input::placeholder {
+  color: var(--muted);
+}
+.ws-block {
+  margin-top: 44px;
+  scroll-margin-top: 90px;
+}
+.ws-h {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  margin-bottom: 16px;
+}
+.ws-step {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--accent-soft);
+  color: var(--accent-2);
+}
+.ws-sub {
+  font-size: 15px;
+  margin: 24px 0 10px;
+}
+.idea-form {
+  display: grid;
+  gap: 14px;
+}
+.textarea.idea {
+  font-size: 16.5px;
+  min-height: 150px;
+}
+.textarea[readonly] {
+  background: transparent;
+  border-style: dashed;
+  color: var(--text-2);
+  resize: none;
+}
+.row {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.row .hint {
+  max-width: 48ch;
+}
+
+.runwait {
+  margin-top: 18px;
+  padding: 18px 20px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.runwait-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--accent-2);
+}
+.runwait-head strong {
+  color: var(--text);
+}
+.runwait ul {
+  margin: 12px 0;
+  display: grid;
+  gap: 6px;
+}
+.runwait li {
+  font-size: 14px;
+  color: var(--text-2);
+  padding-left: 18px;
+  position: relative;
+}
+.runwait li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 9px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.runwait li:nth-child(2)::before {
+  animation-delay: 0.3s;
+}
+.runwait li:nth-child(3)::before {
+  animation-delay: 0.6s;
+}
+.runwait li:nth-child(4)::before {
+  animation-delay: 0.9s;
+}
+.runwait li:nth-child(5)::before {
+  animation-delay: 1.2s;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+.rp-time {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.six {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.six li {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.six li.open {
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+  background: var(--warn-soft);
+}
+.six-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 800;
+}
+.six li.ok .six-mark {
+  background: var(--good-soft);
+  color: var(--good);
+}
+.six li.open .six-mark {
+  background: var(--warn);
+  color: var(--bg);
+}
+.six h3 {
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+.six p {
+  font-size: 13.5px;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.follow {
+  margin-top: 22px;
+  padding: 22px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  display: grid;
+  gap: 16px;
+}
+.follow h3 {
+  font-size: 18px;
+}
+.follow .btn {
+  justify-self: start;
+}
+.brief {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  padding: 0 18px;
+}
+.brief summary {
+  cursor: pointer;
+  padding: 14px 0;
+  font-weight: 600;
+}
+.brief-text {
+  white-space: pre-wrap;
+  font-family: var(--serif);
+  font-size: 15.5px;
+  line-height: 1.7;
+  color: var(--text-2);
+  padding-bottom: 18px;
+}
+.found-comps {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+.found-comps li {
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.fc-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+.fc-sat {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+.found-comps p,
+.found-gaps p {
+  font-size: 13.5px;
+  color: var(--text-2);
+  margin-top: 4px;
+}
+.found-gaps {
+  display: grid;
+  gap: 10px;
+}
+.found-gaps li {
+  padding-left: 16px;
+  border-left: 2px solid var(--good);
+}
+.ws-error {
+  margin-top: 20px;
+}
+
+/* rail */
+.ws-rail {
+  position: sticky;
+  top: 88px;
+  display: grid;
+  gap: 16px;
+}
+.rail-card {
+  padding: 22px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  display: grid;
+  gap: 18px;
+  background-image: var(--glow);
+}
+.rail-top {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.rail-k {
+  font-weight: 700;
+  font-size: 15px;
+}
+.p6-track {
+  stroke: var(--line-2);
+}
+.p6-arc {
+  stroke: var(--accent);
+  transition: stroke-dasharray 0.6s var(--ease);
+}
+.p6-num {
+  font-size: 14px;
+  font-weight: 700;
+  fill: var(--text);
+}
+.btn.block {
+  width: 100%;
+}
+.rail-includes {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.rail-includes li {
+  font-size: 13.5px;
+  color: var(--text-2);
+  padding-left: 22px;
+  position: relative;
+}
+.rail-includes li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--good);
+  font-weight: 700;
+}
+.rail-done {
+  display: grid;
+  gap: 14px;
+}
+.history {
+  display: grid;
+  gap: 4px;
+}
+.history a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  margin: 0 -10px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+.history a:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* report progress */
+.rp {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 440px);
+}
+.rp-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.rp-title {
+  font-weight: 700;
+}
+.rp-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line-2);
+  overflow: hidden;
+}
+.rp-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--cyan), var(--accent), var(--accent-2));
+  background-size: 200% 100%;
+  animation: sheen 2.4s linear infinite;
+  transition: width 0.8s var(--ease);
+}
+@keyframes sheen {
+  to {
+    background-position: -200% 0;
+  }
+}
+.rp-steps {
+  display: grid;
+  gap: 8px;
+}
+.rp-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.rp-steps li.done {
+  color: var(--text-2);
+}
+.rp-steps li.now {
+  color: var(--text);
+  font-weight: 600;
+}
+.rp-steps em {
+  flex-basis: 100%;
+  padding-left: 20px;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.rp-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--line-2);
+  flex-shrink: 0;
+}
+.done .rp-dot {
+  background: var(--good);
+  border-color: var(--good);
+}
+.now .rp-dot {
+  border-color: var(--accent-2);
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@media (max-width: 980px) {
+  .ws {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .ws-rail {
+    position: static;
+  }
+  .ws-rail .rail-includes {
+    display: none;
+  }
+}
+@media (max-width: 620px) {
+  .six {
+    grid-template-columns: 1fr;
+  }
+  .row .btn {
+    width: 100%;
+  }
+}

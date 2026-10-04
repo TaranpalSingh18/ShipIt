@@ -10,7 +10,7 @@ from tavily import TavilyClient
 from db import get_db
 from models.user import User, Project
 from routes.auth.auth import ALGORITHM, SECRET_KEY
-from routes.customer.voice_analysis import generate_customer_voice
+from routes.customer.voice_analysis import apify_search, generate_customer_voice
 from schemas.query_schema import (
     ProjectCreateRequest,
     ProjectCreateResponse,
@@ -20,12 +20,15 @@ from schemas.query_schema import (
 from langchain_groq.chat_models import ChatGroq
 from timing import PipelineTimer
 
+import os_trust
+
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
+os_trust.enable()
 
 groq_api_key = os.getenv("GROQ_API_KEY")
 tavily_api_key = os.getenv("TAVILY_API_KEY")
 
-llm = ChatGroq(model="llama-3.1-8b-instant", api_key=groq_api_key)
+llm = ChatGroq(model="openai/gpt-oss-120b", api_key=groq_api_key)
 
 query = APIRouter(prefix="/api")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
@@ -67,6 +70,88 @@ def strip_code_fences(text: str) -> str:
 def parse_llm_json(content: str) -> dict[str, Any]:
     cleaned = strip_code_fences(content)
     return json.loads(cleaned)
+
+
+POINTER_LABELS = {
+    "customer_segment": (
+        "who it is for",
+        "customer segment",
+    ),
+    "pain_point": (
+        "the pain",
+        "pain point",
+        "biggest pain point",
+    ),
+    "frequency": (
+        "how often",
+        "how frequently",
+    ),
+    "current_solution": (
+        "what they use now",
+        "current solution",
+        "currently solving",
+    ),
+    "advantage": (
+        "why this is better",
+        "advantage",
+    ),
+    "validation": (
+        "what you have checked",
+        "validation",
+    ),
+}
+
+
+def explicit_answers(text: str) -> dict[str, dict[str, Any]]:
+    """Read answers the founder already wrote under a question or a short label."""
+    markers: list[tuple[int, str, int]] = []
+    labels: list[tuple[str, str]] = [
+        (key, question.lower()) for key, question in QUESTIONS.items()
+    ]
+    for key, names in POINTER_LABELS.items():
+        labels.extend((key, name) for name in names)
+
+    lowered = text.lower()
+    for key, label in labels:
+        start = 0
+        while True:
+            index = lowered.find(label, start)
+            if index == -1:
+                break
+            at_line_start = index == 0 or text[index - 1] == "\n"
+            if at_line_start:
+                markers.append((index, key, len(label)))
+            start = index + max(len(label), 1)
+
+    if not markers:
+        return {}
+
+    markers.sort(key=lambda item: (item[0], -item[2]))
+    chosen: list[tuple[int, str, int]] = []
+    covered_until = -1
+    for index, key, length in markers:
+        if index < covered_until:
+            continue
+        chosen.append((index, key, length))
+        covered_until = index + length
+
+    parsed: dict[str, dict[str, Any]] = {}
+    for position, (index, key, length) in enumerate(chosen):
+        next_index = chosen[position + 1][0] if position + 1 < len(chosen) else len(text)
+        answer = text[index + length:next_index].lstrip(" \t:-").strip()
+        if answer:
+            parsed[key] = {"answered": True, "answer": answer}
+    return parsed
+
+
+def merge_answers(base: dict[str, Any], explicit: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in explicit.items():
+        current = merged.get(key)
+        already = isinstance(current, dict) and bool(current.get("answered")) and str(current.get("answer", "")).strip()
+        if not already:
+            merged[key] = value
+    return merged
 
 
 def build_follow_up_questions(result: dict[str, Any]) -> list[str]:
@@ -204,10 +289,13 @@ Example:
 Return JSON only.
 """.strip()
 
+    stated = explicit_answers(query_text)
+
     try:
         llm_answer = llm.invoke(prompt)
-        print("LLM raw response for analyze_product_answers:", llm_answer.content)
-        result = parse_llm_json(llm_answer.content)
+        content = llm_answer.content
+        result = merge_answers(parse_llm_json(content), stated)
+        print("LLM raw response for analyze_product_answers:", content)
     except Exception as e:
         print("LLM parse/invoke failed:", repr(e))
         # Fallback: try simple heuristics to extract obvious answers from the user's text
@@ -226,7 +314,7 @@ Return JSON only.
                 parsed["current_solution"] = {"answered": True, "answer": ", ".join(current)}
             return parsed
 
-        result = heuristic_parse_from_text(query_text)
+        result = merge_answers(heuristic_parse_from_text(query_text), stated)
 
     # Ensure mapping has required keys in a consistent shape
     def normalize_question_mapping(res: dict[str, Any]) -> dict[str, Any]:
@@ -308,6 +396,27 @@ def get_tavily_results(search_query: str) -> dict[str, Any]:
         return {}
 
 
+def _market_results_from_apify(search_query: str) -> dict[str, Any]:
+    items = apify_search(search_query, max_results=5)
+    results: list[dict[str, str]] = []
+    for item in items:
+        metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+        content = str(item.get("markdown") or item.get("text") or metadata.get("description") or "")
+        content = content.strip()
+        if not content:
+            continue
+        results.append(
+            {
+                "url": str(item.get("url") or metadata.get("url") or ""),
+                "title": str(item.get("title") or metadata.get("title") or ""),
+                "content": content[:1500],
+            }
+        )
+    if not results:
+        return {}
+    return {"query": search_query, "source": "apify", "results": results}
+
+
 def generate_market_analysis(
     product_context: str,
     search_query: str = "",
@@ -316,17 +425,23 @@ def generate_market_analysis(
     if not product_context:
         return []
 
+    query_text = search_query or product_context
     if timer:
-        timer.start_phase("phase3_market_tavily_search")
-    tavily_results = get_tavily_results(search_query or product_context)
-    print(tavily_results)
+        timer.start_phase("phase3_market_search")
+    market_results = _market_results_from_apify(query_text)
+    if market_results:
+        print("[MARKET] Using Apify search results")
+    else:
+        print("[MARKET] Apify returned nothing; falling back to Tavily")
+        market_results = get_tavily_results(query_text)
+    print(market_results)
 
-    if not tavily_results:
+    if not market_results:
         return []
 
     if timer:
         timer.start_phase("phase3_market_llm_competitors")
-    prompt = build_market_prompt(product_context, tavily_results)
+    prompt = build_market_prompt(product_context, market_results)
 
     try:
         llm_answer = llm.invoke(prompt)
@@ -352,8 +467,8 @@ def generate_market_analysis(
                         "competitor_because": reason,
                     }
                 )
-        print("===== TAVILY RESULTS =====")
-        print(json.dumps(tavily_results, indent=2))
+        print("===== MARKET SEARCH =====")
+        print(json.dumps(market_results, indent=2))
 
         print("===== LLM RESPONSE =====")
         print(llm_answer.content)

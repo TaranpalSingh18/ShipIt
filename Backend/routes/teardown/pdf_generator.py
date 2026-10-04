@@ -10,26 +10,11 @@ from .pdf_visuals import (
     draw_panel,
     draw_positioning_matrix,
     draw_value_proposition_canvas,
+    sanitize,
 )
 
 OUTPUT_DIR = Path(__file__).parent.parent.parent / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-UNICODE_MAP = {
-    "\u2014": "-",
-    "\u2013": "-",
-    "\u2018": "'",
-    "\u2019": "'",
-    "\u201c": '"',
-    "\u201d": '"',
-    "\u2022": "-",
-    "\u2026": "...",
-    "\u00e9": "e", "\u00e8": "e", "\u00ea": "e",
-    "\u00f9": "u", "\u00e0": "a", "\u00e2": "a",
-    "\u00ed": "i", "\u00f3": "o", "\u00fa": "u",
-    "\u00f1": "n", "\u00e7": "c",
-}
-UNICODE_TRANS = str.maketrans(UNICODE_MAP)
 
 NAVY        = (15, 32, 68)
 DEEP_BLUE   = (30, 64, 120)
@@ -53,10 +38,6 @@ CARD_TGT_B  = (34,  120,  60)
 CARD_FLOW_B = (232, 93,   44)   # orange flow badge
 
 MAX_BULLETS = 3
-
-
-def sanitize(text: str) -> str:
-    return text.translate(UNICODE_TRANS)
 
 
 def _truncate(text: str, limit: int) -> str:
@@ -500,5 +481,3 @@ def md_to_pdf(
     filepath = OUTPUT_DIR / filename
     pdf.output(str(filepath))
     return filepath
-
-print("pdf_generated")

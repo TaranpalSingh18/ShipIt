@@ -6,7 +6,11 @@ from langchain_groq import ChatGroq
 from pydantic import ValidationError
 
 from ..query.query import ProductQuestions
-from schemas.teardown import ProductTeardown, CustomerVoiceAnalysis
+from schemas.teardown import (
+    ProductTeardown,
+    CustomerVoiceAnalysis,
+    ProductTeardownLLMOutput,
+)
 
 from .normalizer import parse_teardown_llm_output
 from .prompts import TEARDOWN_JSON_PROMPT
@@ -18,11 +22,16 @@ if TYPE_CHECKING:
 class TeardownBuilder:
 
     def __init__(self):
+        import os_trust
+
+        os_trust.enable()
         self.llm = ChatGroq(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             api_key=os.getenv("GROQ_API_KEY"),
             temperature=0,
         )
+        # Structured output LLM to reduce JSON parsing failures.
+        self.structured_llm = self.llm.with_structured_output(ProductTeardownLLMOutput)
 
     def _invoke_and_parse(
         self,
@@ -32,6 +41,12 @@ class TeardownBuilder:
         response = self.llm.invoke(prompt)
         content = getattr(response, "content", str(response))
         return parse_teardown_llm_output(content, market_analysis)
+
+    def _invoke_structured(self, prompt: str) -> ProductTeardownLLMOutput:
+        """
+        Prefer structured output to avoid JSON decoding errors.
+        """
+        return self.structured_llm.invoke(prompt)
 
     def build(
         self,
@@ -52,23 +67,33 @@ class TeardownBuilder:
             customer_voice=json.dumps(customer_voice_data, indent=2),
         )
 
+        # Phase 5 timing block
         if timer:
             timer.start_phase("phase5_teardown_llm")
 
+        # First attempt: structured output (strongest safety)
         try:
-            llm_output = self._invoke_and_parse(prompt, market_analysis)
-        except (ValidationError, ValueError, json.JSONDecodeError) as first_error:
-            print("Teardown parse failed, retrying once:", repr(first_error))
-            if timer:
-                timer.start_phase("phase5_teardown_llm_retry")
-            retry_prompt = (
-                prompt
-                + "\n\nIMPORTANT: Return ONLY one valid JSON object. "
-                "List fields MUST be JSON arrays of strings. "
-                'competitors MUST be [{"name": "...", "why_competes": "..."}]. '
-                "Do NOT duplicate keys. Do NOT add extra keys like type."
-            )
-            llm_output = self._invoke_and_parse(retry_prompt, market_analysis)
+            structured = self._invoke_structured(prompt)
+            normalized = structured.model_dump()
+            llm_output = ProductTeardownLLMOutput(**normalized)
+        except Exception as structured_error:
+            print("Teardown structured parse failed, falling back:", repr(structured_error))
+            # Fallback to legacy parse with retry + stricter instructions
+            try:
+                llm_output = self._invoke_and_parse(prompt, market_analysis)
+            except (ValidationError, ValueError, json.JSONDecodeError) as first_error:
+                print("Teardown parse failed, retrying once:", repr(first_error))
+                if timer:
+                    timer.start_phase("phase5_teardown_llm_retry")
+                retry_prompt = (
+                    prompt
+                    + "\n\nIMPORTANT: Return ONLY one valid JSON object. "
+                    "Double-quoted keys/strings. No trailing commas. "
+                    "List fields MUST be JSON arrays. "
+                    'competitors MUST be [{"name": "...", "why_competes": "..."}]. '
+                    "Do NOT duplicate keys. Do NOT add extra keys."
+                )
+                llm_output = self._invoke_and_parse(retry_prompt, market_analysis)
 
         customer_voice = (
             CustomerVoiceAnalysis(**customer_voice_data)

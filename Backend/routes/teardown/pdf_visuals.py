@@ -14,6 +14,35 @@ from schemas.teardown import CompetitorItem, CustomerVoiceAnalysis, ProductTeard
 LOGO_CACHE_DIR = Path(__file__).parent / "assets" / "logo_cache"
 LOGO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
+# Helvetica only draws latin-1. Map the punctuation Groq likes to emit, then drop the rest.
+_UNICODE_MAP = {
+    "\u2014": "-",
+    "\u2013": "-",
+    "\u2011": "-",
+    "\u2010": "-",
+    "\u00ad": "",
+    "\u2018": "'",
+    "\u2019": "'",
+    "\u201c": '"',
+    "\u201d": '"',
+    "\u2022": "-",
+    "\u2026": "...",
+    "\u00a0": " ",
+    "\u202f": " ",
+    "\u200b": "",
+    "\u00e9": "e", "\u00e8": "e", "\u00ea": "e",
+    "\u00f9": "u", "\u00e0": "a", "\u00e2": "a",
+    "\u00ed": "i", "\u00f3": "o", "\u00fa": "u",
+    "\u00f1": "n", "\u00e7": "c",
+}
+_UNICODE_TRANS = str.maketrans(_UNICODE_MAP)
+
+
+def sanitize(text: str) -> str:
+    """Text safe for the core PDF font."""
+    cleaned = (text or "").translate(_UNICODE_TRANS)
+    return cleaned.encode("latin-1", errors="replace").decode("latin-1")
+
 NAVY = (15, 32, 68)
 DEEP_BLUE = (30, 64, 120)
 ACCENT = (232, 93, 44)
@@ -99,7 +128,7 @@ def draw_letter_avatar(pdf: FPDF, x: float, y: float, size: float, letter: str, 
     pdf.set_xy(x, y + size * 0.28)
     pdf.set_font("Helvetica", "B", size * 2.2)
     pdf.set_text_color(*WHITE)
-    pdf.cell(size, size * 0.5, letter.upper(), align="C")
+    pdf.cell(size, size * 0.5, sanitize(letter[:1] or "?").upper(), align="C")
 
 
 def draw_competitor_row(
@@ -133,7 +162,8 @@ def draw_competitor_row(
         pdf.set_xy(x + i * slot_w, y + icon + 1)
         pdf.set_font("Helvetica", "B", 6.5)
         pdf.set_text_color(*DARK_TEXT)
-        name = comp.name[:18] + ("..." if len(comp.name) > 18 else "")
+        name = sanitize(comp.name)
+        name = name[:18] + ("..." if len(name) > 18 else "")
         pdf.cell(slot_w, 3, name, align="C")
 
     return y + icon + 5
@@ -220,7 +250,8 @@ def draw_positioning_matrix(
 
         pdf.set_font("Helvetica", "B" if is_product else "", 5)
         pdf.set_text_color(*ACCENT if is_product else DARK_TEXT)
-        label = name[:14] + ("*" if is_product else "")
+        label = sanitize(name)
+        label = label[:14] + ("*" if is_product else "")
         pdf.set_xy(px + 2.5, py - 1.5)
         pdf.cell(30, 2, label)
 
@@ -231,7 +262,7 @@ import math as _math
 
 
 def _clip_text(text: str, max_chars: int = 35) -> str:
-    text = text.strip()
+    text = sanitize(text).strip()
     return text if len(text) <= max_chars else text[: max_chars - 1].rsplit(" ", 1)[0] + "..."
 
 

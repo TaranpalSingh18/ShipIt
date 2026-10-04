@@ -1,81 +1,75 @@
-import os
-import uuid
+import re
+
 from celery_app import celery_app
 from db import session_local
-from models.user import User, Project
-from routes.query.query import (
-    build_pipeline_state_from_request,
-    run_product_pipeline,
-    persist_project_state,
-)
-from routes.teardown.builder import TeardownBuilder
-from routes.teardown.renderer import TeardownRenderer
-from routes.teardown.pdf_generator import md_to_pdf
-from timing import PipelineTimer
+from models.user import Project, Report
+from routes.report.generator import generate_report
+from routes.report.render import render_pdf
 
-builder = TeardownBuilder()
-renderer = TeardownRenderer()
 
-@celery_app.task(bind=True)
-def generate_teardown_pdf_task(self, project_id: int, user_query: str, user_id: int):
-    """
-    Celery task to run the product pipeline and generate a teardown PDF in the background.
-    """
+def _set(report_id: str, **fields) -> None:
+    """Write report progress in its own short session so pollers see it at once."""
     db = session_local()
-    request_timer = PipelineTimer(label=f"celery_pdf_task_{self.request.id}")
-    
     try:
-        # 1. Fetch user to ensure context is correct (optional but good for consistency)
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            return {"status": "error", "detail": "User not found"}
-
-        # 2. Build state and run pipeline
-        state = build_pipeline_state_from_request(project_id, user_query, user_id, db)
-        questions = run_product_pipeline(state, timer=request_timer, finalize_timer=False)
-        persist_project_state(project_id, user_id, questions, db)
-
-        # 3. Check if fully answered
-        if not questions["fully_answered"]:
-            timing = request_timer.finish()
-            return {
-                "status": "needs_more_info",
-                "follow_up_questions": questions["follow_up_questions"],
-                "question_mapping": questions["question_mapping"],
-                "timing": timing,
-            }
-
-        # 4. Build Markdown
-        try:
-            teardown_data = builder.build(questions, timer=request_timer)
-        except Exception as exc:
-            return {"status": "error", "detail": f"Teardown generation failed: {exc}"}
-
-        request_timer.start_phase("phase6_markdown_render")
-        markdown = renderer.render(teardown_data)
-        product_name = teardown_data.product_name
-
-        # 5. Generate PDF
-        request_timer.start_phase("phase6_pdf_generation")
-        safe_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in product_name).strip().replace(" ", "_")
-        if not safe_name:
-            safe_name = "product_teardown"
-        unique_id = uuid.uuid4().hex[:8]
-        filename = f"{safe_name}_{unique_id}.pdf"
-
-        pdf_path = md_to_pdf(markdown, filename, teardown=teardown_data)
-        timing = request_timer.finish()
-
-        return {
-            "status": "success",
-            "product_name": product_name,
-            "pdf_filename": filename,
-            "pdf_path": str(pdf_path),
-            "download_url": f"/teardown/download/{filename}",
-            "timing": timing,
-        }
-
-    except Exception as e:
-        return {"status": "error", "detail": str(e)}
+        db.query(Report).filter(Report.id == report_id).update(fields)
+        db.commit()
     finally:
         db.close()
+
+
+def project_state(project: Project) -> dict:
+    return {
+        "user_query": project.latest_query or "",
+        "question_mapping": project.question_mapping or {},
+        "product_context": project.product_context or "",
+        "market_analysis": project.market_analysis or [],
+        "customer_voice": project.customer_voice or {},
+    }
+
+
+def build_report(report_id: str) -> dict:
+    """Generate the investor memo for an existing Report row. Used by Celery and inline."""
+    db = session_local()
+    try:
+        report = db.get(Report, report_id)
+        if report is None:
+            return {"status": "error", "detail": "Report not found"}
+        project = db.get(Project, report.project_id)
+        state = project_state(project)
+    finally:
+        db.close()
+
+    _set(report_id, status="running", progress=3, stage="Starting")
+
+    def progress(step: str, pct: int, label: str) -> None:
+        _set(report_id, progress=pct, stage=label)
+
+    try:
+        memo = generate_report(state, progress=progress)
+        progress("pdf", 90, "Designing the PDF")
+        name = re.sub(r"[^A-Za-z0-9]+", "_", memo.narrative.product_name).strip("_") or "investor_memo"
+        filename = f"{name}_{report_id[:8]}.pdf"
+        render_pdf(memo, filename)
+    except Exception as exc:
+        detail = str(exc).encode("ascii", "backslashreplace").decode()[:500]
+        print("[REPORT] generation failed:", detail)
+        _set(report_id, status="failed", stage="Failed", error=detail)
+        return {"status": "error", "detail": detail}
+
+    _set(
+        report_id,
+        status="success",
+        progress=100,
+        stage="Done",
+        product_name=memo.narrative.product_name,
+        verdict=memo.strategy.verdict.label,
+        readiness=memo.meta.readiness,
+        report_json=memo.model_dump(mode="json"),
+        pdf_filename=filename,
+    )
+    return {"status": "success", "report_id": report_id}
+
+
+@celery_app.task(bind=True)
+def generate_report_task(self, report_id: str):
+    return build_report(report_id)

@@ -51,3 +51,44 @@ class Project(Base):
         server_default=func.now(),
         onupdate=func.now()
     )
+
+class Report(Base):
+    """One generated investor memo for a project."""
+
+    __tablename__ = "reports"
+
+    id = Column(String(32), primary_key=True)
+
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # pending -> running -> success | failed
+    status = Column(String, nullable=False, default="pending")
+
+    progress = Column(Integer, nullable=False, default=0)
+
+    stage = Column(String)
+
+    error = Column(String)
+
+    product_name = Column(String)
+
+    verdict = Column(String)
+
+    readiness = Column(Integer)
+
+    report_json = Column(JSON)
+
+    pdf_filename = Column(String)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
+
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now()
+    )

@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ n.product_name }} · Investor Memo</title>
+<style>
+{{ font_css | safe }}
+{% include "report.css" %}
+</style>
+</head>
+<body>
+{% set total = 12 %}
+{% macro chrome(num, title) %}
+  <header class="run-head">
+    <div class="brand"><span class="mark"></span><span>ShipIt</span><span class="sep">/</span><span class="prod">{{ n.product_name }}</span></div>
+    <div class="sect"><span class="sect-num">{{ '%02d' % num }}</span>{{ title }}</div>
+  </header>
+{% endmacro %}
+{% macro foot(num) %}
+  <footer class="run-foot">
+    <span>Confidential · Investor memo prepared by ShipIt · {{ generated }}</span>
+    <span class="pg">{{ '%02d' % num }} <i>/ {{ total }}</i></span>
+  </footer>
+{% endmacro %}
+{% macro heading(eyebrow, title, lede="") %}
+  <div class="sec-head">
+    <div class="eyebrow">{{ eyebrow }}</div>
+    <h2>{{ title }}</h2>
+    {% if lede %}<p class="lede">{{ lede }}</p>{% endif %}
+  </div>
+{% endmacro %}
+{% macro logo(comp, size="md") %}
+  {% if comp.logo %}<img class="logo {{ size }}" src="{{ comp.logo }}" alt="">{% else %}<span class="logo {{ size }} avatar">{{ comp.name | initials }}</span>{% endif %}
+{% endmacro %}
+{% macro dots(score) %}
+  <span class="dot-score s{{ score }}" title="{{ ['None','Partial','Full'][score] }}"></span>
+{% endmacro %}
+
+{# ============================== 01 EXECUTIVE ============================== #}
+<section class="page cover" data-page="1">
+  <div class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-top">
+      <div class="brand light"><span class="mark"></span><span>ShipIt</span><span class="sep">/</span><span>Investor Memo</span></div>
+      <div class="hero-date">{{ generated }}</div>
+    </div>
+    <div class="hero-main">
+      <div class="hero-copy">
+        <div class="verdict-pill v-{{ s.verdict.label | lower | replace(' ', '-') }}"><span class="pip"></span>{{ s.verdict.label }}</div>
+        <h1>{{ n.product_name }}</h1>
+        <p class="one-liner">{{ n.one_liner }}</p>
+        {% if n.category %}<div class="cat">{{ n.category }}</div>{% endif %}
+      </div>
+      <div class="hero-ring">{{ ring | svg }}<div class="ring-cap">Investor readiness</div></div>
+    </div>
+  </div>
+  <div class="page-body cover-body">
+    <div class="kpis">
+      <div class="kpi">
+        <div class="k-label">Total addressable market</div>
+        <div class="k-val {{ 'muted' if m.tam.value_usd is none }}">{{ m.tam.display or 'Not found' }}</div>
+        <div class="k-sub">{% if m.tam.value_usd is not none %}{{ m.tam.label }} {{ m.tam.source_ids | cite }}{% else %}No sourced figure in research{% endif %}</div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">Market growth</div>
+        <div class="k-val {{ 'muted' if m.cagr.value_usd is none }}">{{ m.cagr.display or 'Not found' }}</div>
+        <div class="k-sub">{% if m.cagr.value_usd is not none %}CAGR {{ m.cagr.source_ids | cite }}{% else %}No sourced growth rate{% endif %}</div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">Competitors benchmarked</div>
+        <div class="k-val">{{ meta.competitors_analysed }}</div>
+        <div class="k-sub">{{ meta.pain_signals }} customer pain signals</div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">Evidence strength</div>
+        <div class="k-val ev-{{ meta.evidence }}">{{ meta.evidence | title }}</div>
+        <div class="k-sub">{{ r.sources | length }} web sources consulted</div>
+      </div>
+    </div>
+
+    <div class="exec-grid">
+      <div class="exec-summary">
+        <h3 class="mini">Executive summary</h3>
+        {% for para in n.executive_summary %}<p{% if loop.first %} class="first"{% endif %}>{{ para }}</p>{% endfor %}
+      </div>
+      <div class="exec-side">
+        <div class="list-card good">
+          <h3 class="mini">Why invest</h3>
+          <ol class="ticks">{% for item in n.why_invest %}<li>{{ item }}</li>{% endfor %}</ol>
+        </div>
+        <div class="list-card risk">
+          <h3 class="mini">Key risks</h3>
+          <ol class="ticks">{% for item in n.key_risks %}<li>{{ item }}</li>{% endfor %}</ol>
+        </div>
+      </div>
+    </div>
+
+    <div class="verdict-strip">
+      <div class="vs-label">Verdict</div>
+      <div class="vs-text">{{ s.verdict.headline or s.verdict.bottom_line }}</div>
+    </div>
+
+    {% if c.competitors %}
+    <div class="bench">
+      <span class="bench-label">Benchmarked against</span>
+      {% for comp in c.competitors %}<span class="bench-item">{{ logo(comp, "sm") }}{{ comp.name }}</span>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {{ foot(1) }}
+</section>
+
+{# ============================== 02 PROBLEM ============================== #}
+<section class="page" data-page="2">
+  {{ chrome(2, "Problem & Customer") }}
+  <div class="page-body">
+    {{ heading("The problem", "Who hurts, how badly, and what they do today", "Each pain is rated for severity (out of 5) and backed, where we found one, by what real users say about today's options.") }}
+    <div class="pain-grid">
+      {% for pain in n.pains[:4] %}
+      <article class="pain">
+        <div class="pain-top">
+          <span class="chip id">{{ pain.id }}</span>
+          <span class="sev" aria-label="Severity {{ pain.severity }} of 5">{% for i in range(5) %}<i class="{{ 'on' if i < pain.severity }}"></i>{% endfor %}</span>
+        </div>
+        <h4>{{ pain.title }}</h4>
+        <p>{{ pain.detail }}</p>
+        {% if pain.quote %}
+        <blockquote><span class="q">“</span>{{ pain.quote }}<cite>— {{ pain.quote_by or 'User review' }}</cite></blockquote>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+
+    <h3 class="block-title">Customer segments</h3>
+    <table class="tbl">
+      <thead><tr><th style="width:21%">Segment</th><th>Job to be done</th><th style="width:16%">Frequency</th><th style="width:18%">Uses today</th><th style="width:15%">Willingness to pay</th></tr></thead>
+      <tbody>
+      {% for seg in n.segments %}
+        {% set wtp = seg.willingness_to_pay.split(' ')[0] | lower | replace('–','') | replace('-','') %}
+        <tr><td class="strong">{{ seg.name }}</td><td>{{ seg.job_to_be_done }}</td><td>{{ seg.frequency }}</td><td>{{ seg.current_solution }}</td>
+        <td><span class="pill wtp-{{ wtp }}">{{ wtp | title }}</span><div class="tiny">{{ (seg.willingness_to_pay.split(' ', 1)[1] if ' ' in seg.willingness_to_pay else '') | trim(' –-—:,') }}</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    {% if n.why_now %}
+    <h3 class="block-title">Why now</h3>
+    <div class="why-now">
+      {% for item in n.why_now %}
+      <div class="wn"><div class="wn-num">{{ loop.index }}</div><div><h4>{{ item.signal }}</h4><p>{{ item.detail }}</p></div></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {{ foot(2) }}
+</section>
+
+{# ============================== 03 SOLUTION ============================== #}
+<section class="page" data-page="3">
+  {{ chrome(3, "Solution & Value Proposition") }}
+  <div class="page-body">
+    {{ heading("Value proposition canvas", "How the product fits the customer", "The value map (square) is designed against the customer profile (circle). Fit lines show which reliever answers which pain.") }}
+    {% set vp = n.value_prop %}
+    <div class="canvas">
+      <div class="vmap">
+        <div class="shape-cap">Value map</div>
+        <div class="square">
+          <div class="zone z-products"><h5>Products &amp; services</h5><ul>{% for p in vp.products %}<li><span class="t">{{ p }}</span></li>{% endfor %}</ul></div>
+          <div class="zone z-creators"><h5>Gain creators</h5><ul>{% for g in vp.gain_creators %}<li><span class="chip c">{{ g.id }}</span><span class="t">{{ g.text }}</span></li>{% endfor %}</ul></div>
+          <div class="zone z-relievers"><h5>Pain relievers</h5><ul>{% for rl in vp.pain_relievers %}<li><span class="chip r">{{ rl.id }}</span><span class="t">{{ rl.text }}</span></li>{% endfor %}</ul></div>
+        </div>
+      </div>
+      <div class="fit-arrow"><span>FIT</span></div>
+      <div class="cprof">
+        <div class="shape-cap">Customer profile</div>
+        <div class="circle">
+          <div class="zone z-gains"><h5>Gains</h5><ul>{% for g in vp.gains %}<li><span class="chip g">{{ g.id }}</span><span class="t">{{ g.text }}</span></li>{% endfor %}</ul></div>
+          <div class="zone z-pains"><h5>Pains</h5><ul>{% for p in n.pains %}<li><span class="chip p">{{ p.id }}</span><span class="t">{{ p.title }}</span></li>{% endfor %}</ul></div>
+          <div class="zone z-jobs"><h5>Customer jobs</h5><ul>{% for j in vp.jobs %}<li><span class="t">{{ j }}</span></li>{% endfor %}</ul></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fit-map">
+      {% for rl in vp.pain_relievers %}
+        {% set pain = pains.get(rl.relieves) %}
+        <div class="fit-row"><span class="chip p">{{ rl.relieves }}</span><span class="fit-a">{{ pain.title if pain else rl.relieves }}</span><span class="fit-line"></span><span class="chip r">{{ rl.id }}</span><span class="fit-b">{{ rl.text }}</span></div>
+      {% endfor %}
+      {% for cr in vp.gain_creators %}
+        {% set gain = gains.get(cr.creates) %}
+        <div class="fit-row"><span class="chip g">{{ cr.creates }}</span><span class="fit-a">{{ gain.text if gain else cr.creates }}</span><span class="fit-line"></span><span class="chip c">{{ cr.id }}</span><span class="fit-b">{{ cr.text }}</span></div>
+      {% endfor %}
+    </div>
+
+    <div class="two">
+      <div>
+        <h3 class="block-title">Before &amp; after</h3>
+        <table class="tbl ba">
+          <thead><tr><th style="width:24%"></th><th>Today</th><th>With {{ n.product_name }}</th></tr></thead>
+          <tbody>{% for row in n.before_after %}<tr><td class="strong">{{ row.aspect }}</td><td class="before">{{ row.before }}</td><td class="after">{{ row.after }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+      <div>
+        <h3 class="block-title">User journey</h3>
+        <ol class="journey">
+          {% for step in n.journey %}<li><span class="j-num">{{ loop.index }}</span><div><h4>{{ step.title }}</h4><p>{{ step.detail }}</p></div></li>{% endfor %}
+        </ol>
+      </div>
+    </div>
+  </div>
+  {{ foot(3) }}
+</section>
+
+{# ============================== 04 MARKET ============================== #}
+<section class="page" data-page="4">
+  {{ chrome(4, "Market Opportunity") }}
+  <div class="page-body">
+    {{ heading("Market sizing", "How big this can get", "Every figure below is either quoted from a cited source or derived from one with the arithmetic shown. Figures we could not source are marked “Not found” rather than estimated.") }}
+    <div class="market-top">
+      <div class="tam-wrap">{{ tam_svg | svg }}</div>
+      <div class="growth">
+        <div class="g-label">Annual growth (CAGR)</div>
+        <div class="g-val {{ 'muted' if m.cagr.value_usd is none }}">{{ m.cagr.display or 'Not found' }}</div>
+        {% if m.cagr.value_usd is not none %}
+        <div class="g-bar"><span style="width: {{ [m.cagr.value_usd * 3, 100] | min }}%"></span></div>
+        <div class="g-sub">{{ m.cagr.label }} {{ m.cagr.source_ids | cite }}</div>
+        {% else %}<div class="g-sub">No source in the research stated a growth rate.</div>{% endif %}
+      </div>
+    </div>
+
+    <table class="tbl figures">
+      <thead><tr><th style="width:9%"></th><th>Definition</th><th style="width:14%">Value</th><th style="width:13%">Method</th><th style="width:12%">Confidence</th><th style="width:10%">Source</th></tr></thead>
+      <tbody>
+      {% for key, fig in [("TAM", m.tam), ("SAM", m.sam), ("SOM", m.som), ("CAGR", m.cagr)] %}
+        <tr><td><span class="pill key">{{ key }}</span></td>
+          <td>{{ fig.label or '—' }}{% if fig.note %}<div class="tiny">{{ fig.note }}</div>{% endif %}</td>
+          <td class="num {{ 'muted' if fig.value_usd is none }}">{{ fig.display or 'Not found' }}</td>
+          <td>{{ (fig.method or '—') | title }}</td>
+          <td><span class="conf c-{{ fig.confidence }}"><i></i><i></i><i></i></span>{{ fig.confidence | title }}</td>
+          <td>{% if fig.source_ids %}{{ fig.source_ids | cite }}{% elif fig.value_usd is not none %}<span class="tiny">From TAM</span>{% else %}—{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="two">
+      <div>
+        <h3 class="block-title">Sizing logic</h3>
+        {% if m.sizing_logic %}
+        <ol class="steps">{% for step in m.sizing_logic %}<li>{{ step }}</li>{% endfor %}</ol>
+        {% else %}<p class="empty">No derivation was possible without a sourced TAM. Size bottom-up next: number of target buyers × annual price.</p>{% endif %}
+      </div>
+      <div>
+        <h3 class="block-title">Market trends</h3>
+        {% for trend in m.trends %}
+        <div class="trend"><h4>{{ trend.title }} {{ trend.source_ids | cite }}</h4><p>{{ trend.detail }}</p></div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {{ foot(4) }}
+</section>
+
+{# ============================== 05 LANDSCAPE ============================== #}
+<section class="page" data-page="5">
+  {{ chrome(5, "Competitive Landscape") }}
+  <div class="page-body">
+    {{ heading("Who else is solving this", "The competitive landscape", "Company facts come from cited sources (a dash means we found none). Satisfaction and complaints come from public reviews and forums.") }}
+    <div class="comp-grid n{{ c.competitors | length }}">
+      {% for comp in c.competitors %}
+      <article class="comp">
+        <div class="shot">{% if comp.screenshot %}<img src="{{ comp.screenshot }}" alt="{{ comp.name }} homepage">{% else %}<div class="shot-empty">{{ logo(comp, "lg") }}</div>{% endif %}
+          <span class="threat t-{{ comp.threat }}">{{ comp.threat | title }} threat</span></div>
+        <div class="comp-body">
+          <div class="comp-id">{{ logo(comp) }}<div><h4>{{ comp.name }}</h4><div class="domain">{{ comp.domain or 'website unknown' }}</div></div></div>
+          <p class="tagline">{{ comp.tagline }}</p>
+          <dl class="facts">
+            <div><dt>Founded</dt><dd>{{ comp.founded or '—' }}</dd></div>
+            <div><dt>HQ</dt><dd>{{ comp.hq or '—' }}</dd></div>
+            <div><dt>Funding</dt><dd>{{ comp.funding or '—' }}</dd></div>
+            <div><dt>Pricing</dt><dd>{{ comp.pricing or '—' }}</dd></div>
+          </dl>
+          <div class="sat">
+            <span class="sat-label">Satisfaction</span>
+            <span class="meter {{ 'nodata' if comp.satisfaction == 'unknown' }}"><span class="fill sat-{{ comp.satisfaction }}" style="width: {{ 0 if comp.satisfaction == 'unknown' else comp.satisfaction_score }}%"></span></span>
+            <span class="sat-val">{{ 'No data' if comp.satisfaction == 'unknown' else comp.satisfaction | title }}</span>
+          </div>
+          {% if comp.top_complaint %}<p class="complaint"><b>Top complaint</b> {{ comp.top_complaint }}</p>{% endif %}
+          {% if comp.source_ids %}<div class="srcs">Sources {{ comp.source_ids | cite }}</div>{% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+  {{ foot(5) }}
+</section>
+
+{# ============================== 06 HEAD TO HEAD ============================== #}
+<section class="page" data-page="6">
+  {{ chrome(6, "Head-to-Head") }}
+  <div class="page-body">
+    {{ heading("Feature comparison", "Where we win, where we don't", "Our product's column shows what it will offer at launch, not a roadmap.") }}
+    {% set fm = c.feature_matrix %}
+    <table class="matrix">
+      <thead><tr><th></th>{% for row in fm.rows %}<th class="{{ 'us' if loop.first }}"><div class="mh">{{ row.name }}</div></th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for cap in fm.capabilities %}{% set ci = loop.index0 %}
+        <tr><td class="cap">{{ cap }}</td>{% for row in fm.rows %}<td class="{{ 'us' if loop.first }}">{{ dots(row.scores[ci] if ci < row.scores | length else 0) }}</td>{% endfor %}</tr>
+      {% endfor %}
+      <tr class="total"><td class="cap">Coverage</td>{% for row in fm.rows %}<td class="{{ 'us' if loop.first }}">{{ ((row.scores | sum) / ((fm.capabilities | length) * 2) * 100) | round | int }}%</td>{% endfor %}</tr>
+      </tbody>
+    </table>
+    <div class="legend"><span>{{ dots(2) }} Full</span><span>{{ dots(1) }} Partial</span><span>{{ dots(0) }} None</span></div>
+
+    <div class="pos">
+      <div class="pos-chart">
+        <h3 class="block-title">Positioning map <span class="tag">Analyst assessment</span></h3>
+        {{ positioning_svg | svg }}
+      </div>
+      <div class="pos-notes">
+        {% for point in c.positioning.points %}
+        <div class="pn {{ 'us' if point.is_us }}"><span class="pn-num">{% if point.is_us %}★{% else %}{{ loop.index }}{% endif %}</span><div><b>{{ point.name }}</b><p>{{ point.rationale }}</p></div></div>
+        {% endfor %}
+      </div>
+    </div>
+    {% if c.differentiation %}
+    <div class="why-win"><div class="eyebrow">Why we win</div><p>{{ c.differentiation }}</p></div>
+    {% endif %}
+  </div>
+  {{ foot(6) }}
+</section>
+
+{# ============================== 07 VOICE ============================== #}
+<section class="page" data-page="7">
+  {{ chrome(7, "Voice of the Customer") }}
+  <div class="page-body">
+    {{ heading("What users actually say", "Voice of the customer", "Synthesised from public reviews, forums and comparison sites about each competitor.") }}
+    {% if v.current_solutions %}
+    <div class="chips-row"><span class="chips-label">What people use today</span>{% for item in v.current_solutions %}<span class="chip-lg">{{ item }}</span>{% endfor %}</div>
+    {% endif %}
+
+    <div class="two">
+      <div>
+        <h3 class="block-title">Sentiment by competitor</h3>
+        {% for comp in c.competitors %}
+          {% set sv = sentiment.get(comp.name | lower) %}
+          <div class="sent">
+            <div class="sent-head">{{ logo(comp, "sm") }}<b>{{ comp.name }}</b><span class="meter {{ 'nodata' if comp.satisfaction == 'unknown' }}"><span class="fill sat-{{ comp.satisfaction }}" style="width: {{ 0 if comp.satisfaction == 'unknown' else comp.satisfaction_score }}%"></span></span><span class="sat-val">{{ 'No data' if comp.satisfaction == 'unknown' else comp.satisfaction | title }}</span></div>
+            {% if sv and sv.common_complaints %}<ul class="complaints">{% for item in sv.common_complaints[:3] %}<li>{{ item }}</li>{% endfor %}</ul>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      <div>
+        <h3 class="block-title">Recurring complaint themes</h3>
+        {% for theme in c.complaint_themes %}
+        <div class="theme">
+          <div class="theme-head"><b>{{ theme.theme }}</b><span>{{ theme.mentions }} mention{{ 's' if theme.mentions != 1 }}</span></div>
+          <div class="hbar"><span style="width: {{ (theme.mentions / max_mentions * 100) | round }}%"></span></div>
+          <p class="tiny">“{{ theme.example }}”</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <h3 class="block-title">Market gaps → our angle</h3>
+    <table class="tbl gaps">
+      <thead><tr><th style="width:26%">Gap</th><th style="width:37%">Evidence</th><th>How we close it</th></tr></thead>
+      <tbody>{% for gap in v.market_gaps %}<tr><td class="strong">{{ gap.gap }}</td><td>{{ gap.evidence }}</td><td class="after">{{ gap.product_opportunity }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  {{ foot(7) }}
+</section>
+
+{# ============================== 08 BUSINESS ============================== #}
+<section class="page" data-page="8">
+  {{ chrome(8, "Business Model & Go-to-Market") }}
+  {% set bm = s.business_model %}
+  <div class="page-body">
+    {{ heading(bm.revenue_model or "Business model", "How it makes money", bm.summary) }}
+    <div class="tiers">
+      {% for tier in bm.pricing_tiers %}
+      <div class="tier {{ 'feat' if loop.index == 2 }}">
+        {% if loop.index == 2 %}<span class="tier-flag">Core plan</span>{% endif %}
+        <div class="tier-name">{{ tier.name }}</div>
+        <div class="tier-price">{{ tier.price }}</div>
+        <div class="tier-for">{{ tier.for_who }}</div>
+        <ul>{% for item in tier.includes %}<li>{{ item }}</li>{% endfor %}</ul>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% set priced = c.competitors | selectattr('pricing') | list %}
+    {% if priced %}
+    <div class="bench-prices">
+      <span class="bp-label">Competitor pricing</span>
+      {% for comp in priced %}<span class="bp">{{ logo(comp, "sm") }}<b>{{ comp.name }}</b> {{ comp.pricing }} {{ comp.source_ids | cite }}</span>{% endfor %}
+    </div>
+    {% endif %}
+
+    <h3 class="block-title">Unit economics <span class="tag warn">Assumptions, not data</span></h3>
+    <div class="ue">
+      {% for item in bm.unit_economics %}
+      <div class="ue-tile"><div class="ue-m">{{ item.metric }}</div><div class="ue-v">{{ item.value }}</div><div class="tiny">{{ item.assumption }}</div></div>
+      {% endfor %}
+    </div>
+
+    <h3 class="block-title">Go-to-market</h3>
+    <table class="tbl gtm">
+      <thead><tr><th style="width:24%">Channel</th><th>Tactic</th><th style="width:15%">Priority</th></tr></thead>
+      <tbody>{% for ch in bm.gtm %}<tr><td class="strong">{{ ch.channel }}</td><td>{{ ch.tactic }}</td><td><span class="pill pr-{{ ch.priority | lower }}">{{ ch.priority | title }}</span></td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  {{ foot(8) }}
+</section>
+
+{# ============================== 09 RISK ============================== #}
+<section class="page" data-page="9">
+  {{ chrome(9, "Moats, Risks & Mitigations") }}
+  <div class="page-body">
+    {{ heading("Risk register", "What could kill this, and the plan for each") }}
+    <div class="risk-wrap">
+      <div class="heat">
+        <div class="heat-y">Likelihood →</div>
+        <div class="heat-grid">
+          {% for l in [3, 2, 1] %}{% for i in [1, 2, 3] %}
+          <div class="cell lvl{{ l * i }}">{% for num in risk_cells.get((l, i), []) %}<span class="rk">{{ num }}</span>{% endfor %}</div>
+          {% endfor %}{% endfor %}
+        </div>
+        <div class="heat-ticks"><span>Low</span><span>Med</span><span>High</span></div>
+        <div class="heat-x">Impact →</div>
+      </div>
+      <table class="tbl risks">
+        <thead><tr><th style="width:5%">#</th><th style="width:34%">Risk</th><th style="width:9%">L × I</th><th>Mitigation</th></tr></thead>
+        <tbody>{% for risk in s.risks %}<tr><td><span class="rk">{{ loop.index }}</span></td><td class="strong">{{ risk.risk }}<div class="tiny">{{ risk.category | title }}</div></td><td class="num">{{ risk.likelihood }} × {{ risk.impact }}</td><td>{{ risk.mitigation }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+
+    <div class="two">
+      <div>
+        <h3 class="block-title">Moats <span class="tag">Strength today</span></h3>
+        {% for moat in s.moats %}
+        <div class="moat">
+          <div class="moat-head"><b>{{ moat.name }}</b><span class="seg">{% for i in range(5) %}<i class="{{ 'on' if i < moat.strength }}"></i>{% endfor %}</span></div>
+          <p>{{ moat.detail }}</p>
+        </div>
+        {% endfor %}
+      </div>
+      <div>
+        <h3 class="block-title">Growth opportunities</h3>
+        {% for opp in s.opportunities %}
+        <div class="opp"><span class="opp-arrow">↗</span><div><h4>{{ opp.title }}</h4><p>{{ opp.detail }}</p></div></div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {{ foot(9) }}
+</section>
+
+{# ============================== 10 VERDICT ============================== #}
+<section class="page" data-page="10">
+  {{ chrome(10, "Verdict") }}
+  <div class="page-body">
+    <div class="verdict-hero v-{{ s.verdict.label | lower | replace(' ', '-') }}">
+      <div class="vh-glow"></div>
+      <div class="vh-copy">
+        <div class="eyebrow light">Investment verdict</div>
+        <div class="vh-label">{{ s.verdict.label }}</div>
+        <p class="vh-head">{{ s.verdict.headline }}</p>
+      </div>
+      <div class="vh-ring">{{ ring_small | svg }}</div>
+    </div>
+
+    <div class="score-wrap">
+      <div class="radar-box">{{ radar_svg | svg }}</div>
+      <table class="tbl scores">
+        <thead><tr><th style="width:24%">Dimension</th><th style="width:22%">Score</th><th>Why</th></tr></thead>
+        <tbody>{% for sc in s.scorecard %}<tr><td class="strong">{{ sc.dimension }}</td><td><span class="sbar"><span style="width: {{ sc.score * 10 }}%"></span></span><b class="num">{{ sc.score }}</b><i class="muted">/10</i></td><td>{{ sc.rationale }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+
+    <div class="verdict-body">
+      {% for para in s.verdict.paragraphs %}<p>{{ para }}</p>{% endfor %}
+    </div>
+    {% if s.verdict.bottom_line %}
+    <div class="bottom-line"><span>Bottom line</span>{{ s.verdict.bottom_line }}</div>
+    {% endif %}
+  </div>
+  {{ foot(10) }}
+</section>
+
+{# ============================== 11 NEXT STEPS ============================== #}
+<section class="page" data-page="11">
+  {{ chrome(11, "Next Steps & Investor Q&A") }}
+  <div class="page-body">
+    {{ heading("De-risking plan", "The next 90 days", "Each milestone is a measurable test. Hitting them moves the scorecard; missing them is a signal to pivot.") }}
+    <div class="milestones">
+      {% for ms in s.milestones %}
+      <div class="ms">
+        <div class="ms-h">{{ ms.horizon }}</div>
+        <div class="ms-dot"></div>
+        <h4>{{ ms.goal }}</h4>
+        <dl><dt>Metric</dt><dd>{{ ms.metric }}</dd><dt>Target</dt><dd class="target">{{ ms.target }}</dd></dl>
+      </div>
+      {% endfor %}
+    </div>
+
+    <h3 class="block-title">Questions an investor will ask</h3>
+    <div class="qa">
+      {% for qa in s.investor_qa %}
+      <div class="qa-item"><div class="qa-q"><span>Q{{ loop.index }}</span>{{ qa.question }}</div><p class="qa-a">{{ qa.answer }}</p></div>
+      {% endfor %}
+    </div>
+
+    <div class="idea-box">
+      <div class="eyebrow">The founder's brief</div>
+      <p>{{ meta.idea }}</p>
+    </div>
+  </div>
+  {{ foot(11) }}
+</section>
+
+{# ============================== 12 SOURCES ============================== #}
+<section class="page" data-page="12">
+  {{ chrome(12, "Sources") }}
+  <div class="page-body">
+    {{ heading("Appendix", "Sources", "Numbered references cited in this memo (bold) and the other pages consulted during research. Figures without a source were not used.") }}
+    <ol class="sources">
+      {% for src in r.sources %}
+      <li class="{{ 'cited' if src.id in cited }}"><span class="s-id">{{ src.id }}</span><a class="s-title" href="{{ src.url }}">{{ src.title }}</a><span class="s-url">{{ src.domain }}</span></li>
+      {% endfor %}
+    </ol>
+  </div>
+  {{ foot(12) }}
+</section>
+</body>
+</html>

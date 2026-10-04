@@ -1,4 +1,6 @@
-import uuid
+import asyncio
+
+import redis
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
@@ -18,10 +20,23 @@ from .builder import TeardownBuilder
 from .renderer import TeardownRenderer
 from .pdf_generator import md_to_pdf, OUTPUT_DIR
 from timing import PipelineTimer
-from tasks import generate_teardown_pdf_task
+from celery_app import broker_url
+from tasks import build_teardown_pdf, generate_teardown_pdf_task
 from celery.result import AsyncResult
 
 teardown = APIRouter(tags=["teardown"], prefix="/teardown")
+
+
+def _broker_reachable() -> bool:
+    try:
+        client = redis.Redis.from_url(
+            broker_url,
+            socket_connect_timeout=0.4,
+            socket_timeout=0.4,
+        )
+        return bool(client.ping())
+    except Exception:
+        return False
 
 builder = TeardownBuilder()
 renderer = TeardownRenderer()
@@ -101,20 +116,33 @@ async def generate_teardown_pdf(
     """
     Starts a background task to generate a full product teardown and save it as a PDF.
     Returns a task_id to poll for status.
+
+    When Redis is not running, the PDF is written in this request instead.
     """
-    task = generate_teardown_pdf_task.delay(
+    if _broker_reachable():
+        task = generate_teardown_pdf_task.delay(
+            payload.project_id,
+            payload.user_query,
+            current_user.id
+        )
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status": "pending",
+                "task_id": task.id,
+                "message": "Teardown generation started in background"
+            },
+        )
+
+    result = await asyncio.to_thread(
+        build_teardown_pdf,
         payload.project_id,
         payload.user_query,
-        current_user.id
+        current_user.id,
+        "inline_pdf_request",
     )
-    return JSONResponse(
-        status_code=202,
-        content={
-            "status": "pending",
-            "task_id": task.id,
-            "message": "Teardown generation started in background"
-        },
-    )
+    status_code = 200 if result.get("status") != "error" else 502
+    return JSONResponse(status_code=status_code, content=result)
 
 
 @teardown.get("/task/{task_id}")
@@ -139,12 +167,22 @@ async def get_task_status(task_id: str):
 
 
 @teardown.get("/download/{filename}")
-async def download_pdf(filename: str):
+async def download_pdf(filename: str, view: int = 0):
     """
     Download a generated PDF by filename from the Backend/output/ directory.
+    Pass view=1 to open it in the browser instead of saving it.
     """
-    filepath = OUTPUT_DIR / filename
-    if not filepath.exists():
+    from pathlib import Path
+
+    safe_name = Path(filename).name
+    if safe_name != filename or not safe_name.lower().endswith(".pdf"):
+        return JSONResponse(
+            status_code=404,
+            content={"status": "error", "detail": "PDF file not found"},
+        )
+
+    filepath = OUTPUT_DIR / safe_name
+    if not filepath.is_file():
         return JSONResponse(
             status_code=404,
             content={"status": "error", "detail": "PDF file not found"},
@@ -154,5 +192,6 @@ async def download_pdf(filename: str):
     return FileResponse(
         path=str(filepath),
         media_type="application/pdf",
-        filename=filename,
+        filename=safe_name,
+        content_disposition_type="inline" if view else "attachment",
     )

@@ -34,9 +34,9 @@ Drop in a product idea → ShipIt runs it through **4 research phases**, then ge
    - **Apify** (optional): deeper forum/review scraping when `VOICE_USE_APIFY=true` and `APIFY_API_KEY` is set (off by default for speed)
    - Output is structured as `CustomerVoiceAnalysis`: current solutions, competitor sentiment, market gaps, and recommended features
 
-4. **Teardown Report** — With full product context, market intel, and customer voice, a structured LLM call (Groq LLaMA 3.3 70B) generates a `ProductTeardown` object validated via Pydantic. Features and opportunities are **gap-driven** — tied to real competitor dissatisfaction, not generic founder assumptions.
+4. **Investor Memo** — With the product context, competitors and customer voice in hand, ShipIt researches further (market size and growth, each competitor's pricing, funding, founding year and HQ) and keeps every web result in a numbered source list. Four Groq calls write the memo in sections, and every number has to cite a source: figures without one are replaced with "Not found" rather than estimated. Competitor logos and homepage screenshots are captured with headless Chromium.
 
-Output is available as **Markdown** (Jinja2 template) and a **professionally styled PDF** (fpdf2) with cover page, auto-generated table of contents, and branded sections.
+The memo is a **12-page A4 PDF** (HTML + SVG rendered by Chromium) and the same content as an **interactive report** in the web app: sortable competitor tables, a hoverable positioning map, a value-proposition canvas that links each pain to its reliever, a risk heatmap, a scorecard radar and a sources drawer.
 
 ![Architecture Diagram](Backend/output/arch.png)
 ---
@@ -68,7 +68,7 @@ TAVILY_VOICE_MAX_RESULTS="3"
 
 See [`Backend/FLOW.md`](Backend/FLOW.md) for a beginner-friendly walkthrough of every file and how data flows through the pipeline.
 
-### 3. Run the server
+### 3. Run the server (local, no Docker)
 
 From the repo root:
 
@@ -77,6 +77,32 @@ uvicorn Backend.main:app --reload
 ```
 
 API docs: `http://localhost:8000/docs`
+
+### 3b. Run with Docker + Nginx (recommended for scaling)
+
+From the repo root:
+
+```bash
+docker compose up --build
+```
+
+This will start:
+
+- a `backend` FastAPI container on port 8000 (internal)
+- a `celery` worker container for background PDF generation
+- a `db` container (PostgreSQL)
+- a `redis` container (Celery broker + result backend)
+- an `nginx` reverse proxy on port 80
+
+The Nginx container routes `http://localhost/` → `backend`.
+
+To run multiple backend containers (horizontal scaling on one machine), use:
+
+```bash
+docker compose up --build --scale backend=3
+```
+
+Docker will load-balance requests from Nginx across the `backend` replicas.
 
 ### 4. Run database migrations (recommended)
 
@@ -89,54 +115,29 @@ alembic upgrade head
 
 For local dev only, you can skip Alembic and set `AUTO_CREATE_DB=true` in `.env` (default).
 
-### 5. Generate a PDF teardown
+### 5. Write an investor memo
 
-First sign up, log in, and create a project:
-
-```bash
-# Signup
-curl -X POST http://localhost:8000/api/signup \
-  -H "Content-Type: application/json" \
-  -d '{"email":"you@example.com","name":"You","password":"secret1234"}'
-
-# Login (save the access_token)
-curl -X POST http://localhost:8000/api/login \
-  -d "username=you@example.com&password=secret1234"
-
-# Create a project (save project_id)
-curl -X POST http://localhost:8000/api/projects \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"project_name":"My Idea"}'
-```
-
-Then generate the PDF (requires JWT):
+Run the frontend (`cd Frontend && npm install && npm run dev`) and use the app, or call the API.
+First sign up, log in, create a project and answer the six questions with `POST /api/query`
+until `fully_answered` is `true`. Then:
 
 ```bash
-curl -X POST http://localhost:8000/teardown/generate-pdf \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"project_id\": 1, \"user_query\": \"AI mock interview platform for final-year engineering students...\"}"
+# Start the memo (returns a report id; runs on Celery when Redis is up, otherwise in a thread)
+curl -X POST http://localhost:8000/api/projects/1/reports -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# Poll progress, then read the memo JSON when status is "success"
+curl http://localhost:8000/api/reports/REPORT_ID -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# Download the PDF
+curl -o memo.pdf http://localhost:8000/api/reports/REPORT_ID/pdf -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
-If discovery is incomplete, you'll get `follow_up_questions` back. Submit again with more context until you get the full report.
-
-Response on success:
-
-```json
-{
-  "status": "success",
-  "product_name": "CampusMock AI",
-  "pdf_filename": "CampusMock_AI_a1b2c3d4.pdf",
-  "pdf_path": "Backend/output/CampusMock_AI_a1b2c3d4.pdf",
-  "download_url": "/teardown/download/CampusMock_AI_a1b2c3d4.pdf"
-}
-```
-
-Download the PDF:
+To iterate on the memo design without any LLM calls, render the bundled fixture:
 
 ```bash
-curl -O http://localhost:8000/teardown/download/CampusMock_AI_a1b2c3d4.pdf
+cd Backend
+playwright install chromium          # once
+python scripts/render_sample_report.py --png   # → output/sample_report.pdf + output/sample_pages/*.png
 ```
 
 ---
@@ -148,11 +149,12 @@ curl -O http://localhost:8000/teardown/download/CampusMock_AI_a1b2c3d4.pdf
 | Framework | **FastAPI** (Python) | Async API server with automatic OpenAPI docs and Pydantic integration |
 | Database | **PostgreSQL** + SQLAlchemy | Reliable relational storage for users and projects |
 | Auth | **JWT** + **Argon2** (passlib) | Secure token-based auth with modern password hashing |
-| LLM | **Groq** via LangChain | 8B for discovery/voice analysis; 70B for teardown generation |
+| LLM | **Groq** via LangChain | `gpt-oss-120b` and `gpt-oss-20b`; memo sections are split across both to stay inside per-model rate limits |
 | Search | **Tavily API** | Competitor discovery and per-competitor review/complaint research |
 | Scraping | **Apify** (optional) | Deep web scraping for richer customer sentiment data |
-| Templates | **Jinja2** | Server-side Markdown rendering from structured teardown data |
-| PDF | **fpdf2** | Programmatic PDF generation with cover page, TOC, headers, and styled sections |
+| Templates | **Jinja2** | Server-side HTML for the investor memo |
+| PDF & capture | **Playwright (Chromium)** | Prints the HTML memo to PDF; captures competitor homepages |
+| Frontend | **React 19 + Vite**, React Router | Landing, case dashboard, workspace and interactive report |
 | Validation | **Pydantic v2** | Strict schema enforcement for all request/response models |
 
 ---
@@ -186,7 +188,8 @@ Backend/
 ├── schemas/
 │   ├── auth.py                     # Signup/Login request schemas
 │   ├── query_schema.py             # Query request/response
-│   └── teardown.py                 # ProductTeardown, CustomerVoiceAnalysis, MarketGap, etc.
+│   ├── teardown.py                 # ProductTeardown, CustomerVoiceAnalysis, MarketGap, etc.
+│   └── report.py                   # InvestorReport — the memo schema
 ├── routes/
 │   ├── auth/auth.py                # /api/signup, /api/login with JWT + Argon2
 │   ├── query/
@@ -195,7 +198,17 @@ Backend/
 │   ├── customer/
 │   │   ├── voice_analysis.py       # Phase 4: hybrid Tavily/Apify customer voice research
 │   │   └── behaviour.py            # Dev-only /behaviour/debug endpoint
-│   └── teardown/
+│   ├── research/
+│   │   ├── market_research.py      # Tavily searches + numbered SourceRegistry
+│   │   └── competitor_assets.py    # Logos (favicon service) + homepage screenshots
+│   ├── report/
+│   │   ├── router.py               # /api/projects, /api/reports endpoints
+│   │   ├── generator.py            # 4 section LLM calls + source validation → InvestorReport
+│   │   ├── prompts.py              # Section prompts
+│   │   ├── charts.py               # SVG charts (ring, TAM circles, positioning map, radar)
+│   │   ├── render.py               # HTML → PDF with Chromium (auto-fits each page)
+│   │   └── templates/              # report.html.j2 + report.css (12-page memo)
+│   └── teardown/                   # Legacy one-pager (no longer mounted in main.py)
 │       ├── template.py             # /teardown/ endpoints — orchestrates full pipeline
 │       ├── builder.py              # LLM teardown generation → ProductTeardown
 │       ├── normalizer.py           # JSON parse + coerce malformed LLM output
@@ -219,9 +232,12 @@ Backend/
 | `POST` | `/api/projects` | ✅ | Create a project → returns `project_id` |
 | `POST` | `/api/query` | ✅ | Run full discovery pipeline (Phases 1–4); persists state to project |
 | `GET` | `/api/query` | ✅ | Verify auth status |
-| `POST` | `/teardown/` | ✅ | Full teardown → Markdown |
-| `POST` | `/teardown/generate-pdf` | ✅ | Full teardown → PDF file in `Backend/output/` |
-| `GET` | `/teardown/download/{filename}` | ❌ | Download a generated PDF |
+| `GET` | `/api/projects` | ✅ | List your cases with their latest memo |
+| `GET` | `/api/projects/{id}` | ✅ | One case: discovery state and memo history |
+| `POST` | `/api/projects/{id}/reports` | ✅ | Start writing the investor memo (202) |
+| `GET` | `/api/reports/{id}` | ✅ | Memo status, progress and, when done, the full memo JSON |
+| `GET` | `/api/reports/{id}/pdf` | ✅ | Download the memo PDF (owner only) |
+| `GET` | `/api/reports/{id}/media/{file}` | ❌ | Competitor logo/screenshot (the report id is the capability) |
 | `POST` | `/behaviour/debug` | ❌ | Dev-only: test customer voice for one competitor |
 
 ---
@@ -261,33 +277,45 @@ User submits idea
           │
           ▼
 ┌─────────────────────────┐
-│  Teardown Generation    │
-│  LLM 70B → JSON →       │
-│  ProductTeardown schema │
+│  Memo research          │
+│  market size, pricing,  │
+│  funding → numbered     │
+│  sources, logos, shots  │
+└─────────┬───────────────┘
+          │
+          ▼
+┌─────────────────────────┐
+│  Memo writing           │
+│  4 section LLM calls →  │
+│  InvestorReport; drop   │
+│  unsourced numbers      │
 └─────────┬───────────────┘
           │
           ▼
 ┌─────────────────────────┐
 │  Rendering              │
-│  Jinja2 → Markdown      │
-│  fpdf2  → PDF           │
+│  Jinja2 + SVG → HTML    │
+│  Chromium → 12-page PDF │
+│  + interactive web view │
 └─────────────────────────┘
 ```
 
 ---
 
-## PDF Report Sections
+## Investor Memo Pages
 
-The generated investor-ready PDF includes:
-
-- One-Liner & Executive Summary
-- Target Users, Pain Points, Core Features, User Journey
-- Competitors
-- **What Customers Use Today**
-- **Competitor Satisfaction** (with evidence-backed complaints)
-- **Market Gaps** (unmet needs + product opportunity)
-- **How This Product Closes the Gap** (gap-driven features)
-- Market Positioning, Business Model, Moats, Opportunities, Risks, Verdict
+1. **Executive one-pager** — verdict, readiness score, TAM, growth, why invest, key risks
+2. **Problem & customer** — pains with severity and real user quotes, segments, why now
+3. **Value proposition** — Strategyzer canvas with pain → reliever and gain → creator fit map, before/after, user journey
+4. **Market** — TAM/SAM/SOM with method, confidence and sources; CAGR; sizing logic; trends
+5. **Competitive landscape** — homepage screenshot, logo, founded, HQ, funding, pricing, satisfaction, top complaint
+6. **Head-to-head** — feature matrix, positioning map with a reason for every placement, why we win
+7. **Voice of the customer** — sentiment per competitor, complaint themes, gaps → our angle
+8. **Business model & GTM** — pricing tiers vs competitor pricing, unit-economics assumptions, channels
+9. **Risks & moats** — likelihood × impact heatmap with mitigations, moat strength, opportunities
+10. **Verdict** — five-part scorecard radar, reasoning, bottom line
+11. **Next 90 days** — milestones with metrics and targets, investor Q&A
+12. **Sources** — every page read, cited ones highlighted
 
 ---
 

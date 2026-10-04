@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
@@ -20,13 +21,22 @@ load_dotenv()
 
 groq_api_key = os.getenv("GROQ_API_KEY")
 tavily_api_key = os.getenv("TAVILY_API_KEY")
-apify_api_key = os.getenv("APIFY_API_KEY")
+apify_api_key = (
+    os.getenv("APIFY_API_KEY")
+    or os.getenv("APIFY_API_TOKEN")
+    or os.getenv("APIFY_TOKEN")
+)
 
 MAX_WORKERS = min(8, (os.cpu_count() or 4) + 2)
 APIFY_DEEP_LIMIT = 3
 VOICE_COMPETITOR_LIMIT = int(os.getenv("VOICE_COMPETITOR_LIMIT", "3"))
-VOICE_USE_APIFY = os.getenv("VOICE_USE_APIFY", "false").lower() in ("1", "true", "yes")
+# Apify is the research source. Set VOICE_USE_APIFY=false to fall back to Tavily.
+VOICE_USE_APIFY = os.getenv("VOICE_USE_APIFY", "true").lower() in ("1", "true", "yes")
 TAVILY_VOICE_MAX_RESULTS = int(os.getenv("TAVILY_VOICE_MAX_RESULTS", "3"))
+APIFY_MAX_RESULTS = int(os.getenv("APIFY_MAX_RESULTS", "3"))
+
+_apify_tool = None
+_apify_lock = threading.Lock()
 
 VOICE_SYNTHESIS_PROMPT = """
 You are a senior product researcher analyzing customer voice and market gaps.
@@ -114,36 +124,55 @@ def _tavily_competitor_search(competitor_name: str) -> dict[str, Any]:
     return json.loads(payload)
 
 
+def _apify_browser() -> ApifyActorsTool:
+    global _apify_tool
+    if _apify_tool is None:
+        with _apify_lock:
+            if _apify_tool is None:
+                _apify_tool = ApifyActorsTool(
+                    "apify/rag-web-browser",
+                    apify_api_token=apify_api_key,
+                )
+    return _apify_tool
+
+
+def apify_search(query: str, max_results: int = APIFY_MAX_RESULTS) -> list[dict[str, Any]]:
+    """Run apify/rag-web-browser and return dataset items."""
+    if not apify_api_key or not query.strip():
+        return []
+
+    started = time.perf_counter()
+    try:
+        _apify_browser()
+        raw = _apify_browser().invoke(
+            {"run_input": {"query": query, "maxResults": max_results}}
+        )
+    except Exception as e:
+        print("Apify search failed:", repr(e))
+        return []
+    finally:
+        print(f"[APIFY] search ({time.perf_counter() - started:.2f}s) maxResults={max_results}")
+
+    if isinstance(raw, list):
+        return [item for item in raw if isinstance(item, dict)]
+    return []
+
+
 def _apify_deep_scrape(competitor_name: str, product_context: str) -> str:
     if not apify_api_key or not VOICE_USE_APIFY:
         return ""
 
     context_snippet = product_context[:200].replace("\n", " ")
     query = f"{competitor_name} user reviews complaints alternatives {context_snippet}"
+    raw_data = apify_search(query, max_results=APIFY_MAX_RESULTS)
+    print(f"[VOICE] Apify scrape '{competitor_name}' items={len(raw_data)}")
 
-    started = time.perf_counter()
-    try:
-        browser = ApifyActorsTool(
-            "apify/rag-web-browser",
-            apify_api_token=apify_api_key,
-        )
-        raw_data = browser.invoke({"run_input": {"query": query}})
-    except Exception as e:
-        print(f"Apify deep scrape failed for {competitor_name}:", repr(e))
-        return ""
-    finally:
-        print(f"[VOICE] Apify scrape '{competitor_name}' ({time.perf_counter() - started:.2f}s)")
-
-    markdown_sources: list[str] = []
-    if isinstance(raw_data, list):
-        raw_markdowns = [
-            item["markdown"]
-            for item in raw_data
-            if isinstance(item, dict) and item.get("markdown")
-        ]
-        if raw_markdowns:
-            markdown_sources = _run_in_parallel(minify_markdown, raw_markdowns)
-
+    raw_markdowns = [
+        item["markdown"]
+        for item in raw_data
+        if isinstance(item, dict) and item.get("markdown")
+    ]
+    markdown_sources = _run_in_parallel(minify_markdown, raw_markdowns) if raw_markdowns else []
     return "\n\n---\n\n".join(markdown_sources)[:8000]
 
 
@@ -152,17 +181,19 @@ def _research_competitor(args: tuple[str, bool, str]) -> tuple[str, str]:
     started = time.perf_counter()
     parts: list[str] = []
 
-    tavily_results = _tavily_competitor_search(competitor_name)
-    if tavily_results:
-        parts.append(f"TAVILY:\n{json.dumps(tavily_results, indent=2)}")
-
     if use_apify:
         apify_text = _apify_deep_scrape(competitor_name, product_context)
         if apify_text:
             parts.append(f"APIFY:\n{apify_text}")
 
+    if not parts:
+        tavily_results = _tavily_competitor_search(competitor_name)
+        if tavily_results:
+            parts.append(f"TAVILY:\n{json.dumps(tavily_results, indent=2)}")
+
     elapsed = time.perf_counter() - started
-    print(f"[VOICE] Research done '{competitor_name}' total={elapsed:.2f}s apify={use_apify}")
+    source = "apify" if any(part.startswith("APIFY:") for part in parts) else "tavily"
+    print(f"[VOICE] Research done '{competitor_name}' total={elapsed:.2f}s source={source}")
     return competitor_name, "\n\n".join(parts) if parts else "No research evidence found."
 
 
@@ -197,10 +228,12 @@ def generate_customer_voice(
     if not competitors:
         return _empty_customer_voice()
 
-    if VOICE_USE_APIFY:
-        print(f"[VOICE] Apify deep scrape ENABLED for top {APIFY_DEEP_LIMIT} competitors")
+    if VOICE_USE_APIFY and apify_api_key:
+        print(f"[VOICE] Apify research for top {min(APIFY_DEEP_LIMIT, len(competitors))} competitors")
+    elif VOICE_USE_APIFY:
+        print("[VOICE] APIFY_API_KEY is missing; competitor research will use Tavily")
     else:
-        print("[VOICE] Apify disabled (fast mode). Set VOICE_USE_APIFY=true for deeper research.")
+        print("[VOICE] VOICE_USE_APIFY=false; competitor research will use Tavily")
 
     research_args = [
         (
@@ -232,8 +265,11 @@ def generate_customer_voice(
         timer.start_phase("phase4_voice_llm_synthesis")
 
     try:
+        import os_trust
+
+        os_trust.enable()
         llm = ChatGroq(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             api_key=groq_api_key,
             temperature=0,
         ).with_structured_output(CustomerVoiceAnalysis)
