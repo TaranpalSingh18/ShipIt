@@ -1,356 +1,469 @@
 # ShipIt
 
-ShipIt turns a raw product idea into an **investor-grade teardown report** — automatically.
+**Turn any product idea into an investor-grade memo in 90 seconds.**
 
-Founders waste weeks asking the wrong questions, cherry-picking data, and building products nobody needs. ShipIt fixes this by running any idea through a **rigorous, LLM-powered discovery pipeline** that forces you to think through every dimension of your product *before* you start coding.
+ShipIt is an AI-powered discovery platform that validates your product idea before you code. It runs rigorous market research, competitive analysis, and customer voice research—then synthesizes everything into a beautiful 12-page memo with sourced data.
+
+No invented metrics. No hand-wavy market sizing. Just facts, sources, and a clear verdict on whether your idea is worth building.
+
+---
+
+## Scaling plan
+
+![ShipIt scaling plan](docs/screenshots/scaling-plan.png)
 
 ---
 
 ## The Problem
 
-Every great product starts as a raw idea. But between a founder's napkin sketch and a fundable business thesis lies a gap that typically requires weeks of research, multiple expert consultations, and expensive market analysis tools to bridge.
+Founders spend weeks validating ideas the wrong way:
+- **Analysis paralysis** — What questions should I even ask?
+- **Confirmation bias** — Cherry-picking data that supports the idea.
+- **Shallow research** — A Google search and a spreadsheet isn't validation.
+- **Wasted months** — Building a product no one wants.
 
-Most founders fall into one of these traps:
-
-- **Analysis paralysis** — They don't know which questions to ask, so they never start.
-- **Confirmation bias** — They only seek evidence that validates their idea and ignore risks.
-- **Surface-level research** — A quick Google search and a Notion doc does not replace rigorous competitive analysis.
-- **Expensive dead ends** — Building a product only to discover nobody actually needs it.
-
-The core difficulty is not a lack of information — it's the **lack of a structured, repeatable system** that forces you to think through every dimension of a product idea *before* you start coding. ShipIt provides that system.
+ShipIt fixes this by forcing you to think through every dimension of your idea *before* you write a line of code.
 
 ---
 
-## What It Does
+## What You Get
 
-Drop in a product idea → ShipIt runs it through **4 research phases**, then generates a teardown report:
+### 🎯 The Memo: 12 Pages of Investor-Ready Analysis
 
-1. **Product Discovery** — An LLM (Groq LLaMA 3.1 8B) analyzes your idea against 6 fundamental questions: customer segment, pain point, frequency, current solution, advantage, and validation. The system doesn't ask all 6 upfront — it checks what's already answered in your input and only asks targeted follow-ups for what's missing.
+1. **Executive One-Pager** — Verdict, readiness score, key KPIs, and why to invest
+2. **Problem & Customer** — Real pain points with user quotes and source citations
+3. **Value Proposition** — Corrected Strategyzer canvas showing which reliever fixes which pain
+4. **Market Opportunity** — TAM/SAM/SOM with method and confidence levels
+5. **Competitive Landscape** — Competitor cards with logos, screenshots, pricing, and satisfaction
+6. **Head-to-Head** — Feature matrix and positioning map with rationale
+7. **Voice of Customer** — Sentiment analysis and recurring complaint themes
+8. **Business Model** — Pricing tiers benchmarked against competitors
+9. **Risks & Moats** — Likelihood×impact heatmap with mitigations
+10. **Verdict** — Five-axis scorecard and final recommendation
+11. **90-Day Plan** — Milestones and validation targets
+12. **Sources** — Every number linked back to a cited source
 
-2. **Market Intel** — Once all 6 questions are answered, ShipIt builds a search query from your product context and searches the web via **Tavily** for real competitors. The LLM identifies specific, named competitors with reasoning grounded in actual search results — not generic industry guesses.
+### 📊 Interactive Report
 
-3. **Customer Voice & Gap Analysis** — For each competitor, ShipIt researches what customers use, whether they're satisfied, and where the gaps are:
-   - **Tavily** (always): per-competitor review and complaint search
-   - **Apify** (optional): deeper forum/review scraping when `VOICE_USE_APIFY=true` and `APIFY_API_KEY` is set (off by default for speed)
-   - Output is structured as `CustomerVoiceAnalysis`: current solutions, competitor sentiment, market gaps, and recommended features
+Same memo rendered in the web app:
+- Hoverable charts (positioning map, risk heatmap, radar)
+- Sortable competitor table with live filtering
+- Direct-label TAM circles and trend analysis
+- Sources drawer—click any footnote to see where the data came from
+- **Download PDF** for sharing with investors or your team
 
-4. **Investor Memo** — With the product context, competitors and customer voice in hand, ShipIt researches further (market size and growth, each competitor's pricing, funding, founding year and HQ) and keeps every web result in a numbered source list. Four Groq calls write the memo in sections, and every number has to cite a source: figures without one are replaced with "Not found" rather than estimated. Competitor logos and homepage screenshots are captured with headless Chromium.
+### 🔍 How It Works
 
-The memo is a **12-page A4 PDF** (HTML + SVG rendered by Chromium) and the same content as an **interactive report** in the web app: sortable competitor tables, a hoverable positioning map, a value-proposition canvas that links each pain to its reliever, a risk heatmap, a scorecard radar and a sources drawer.
+1. **Answer 6 Questions** about your customer, problem, solution, and validation
+2. **AutoResearch** — Tavily searches for real competitors and market data
+3. **Capture Assets** — Playwright screenshots competitor homepages; Google favicon API for logos
+4. **Generate Memo** — Four parallel Groq LLM calls write sections in under 2 minutes
+5. **Render PDF** — Chromium prints the memo to A4 with styled headers/footers
 
-![Architecture Diagram](Backend/output/arch.png)
+Every number in the memo carries a source ID. Unsourced figures show "Not found" instead of being invented.
+
+---
+
+## Screenshots
+
+### 🏠 Landing Page Hero
+Bold headline, animated memo stack, and CTA buttons. The page immediately shows what ShipIt does.
+
+![Landing page hero with animated memo preview](docs/screenshots/01-landing.png)
+
+---
+
+### 📄 Report: Executive Summary
+Verdict badge, **readiness score ring** (the large circle), four KPI tiles, and executive summary. This is page 1 that investors scan first.
+
+![Executive one-pager memo with readiness ring and KPIs](docs/screenshots/04-report-executive.png)
+
+---
+
+### 🎯 Report: Value Proposition Canvas
+The **Strategyzer canvas** — value map (square, left) and customer profile (circle, right) connected by **fit lines** showing which pain each feature relieves. Beautiful, data-driven visualization.
+
+![Value proposition canvas with pain-to-reliever connections](docs/screenshots/05-report-value-prop.png)
+
+---
+
+### 🏆 Report: Competitive Landscape
+Real competitor **cards with live homepage screenshots**, logos, founding year, HQ, funding, pricing tiers, satisfaction score, and top complaint. Investors see you've done your research.
+
+![Competitor analysis cards with screenshots and metrics](docs/screenshots/06-report-competition.png)
+
+---
+
+### 🌙 Light Theme
+Same beautiful memo in light mode — dark navy and indigo becomes soft white and purple. Works perfectly at 1440px desktop and 375px mobile.
+
+![Executive summary in light theme](docs/screenshots/07-report-light-theme.png)
+
+---
+
+**Want to see every page?** Check out [`docs/SCREENSHOTS.md`](docs/SCREENSHOTS.md) for a full walkthrough of all 12 memo pages and interactive report features.
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Why |
+|-------|-----------|-----|
+| **API** | FastAPI + uvicorn | Async, automatic OpenAPI docs, Pydantic validation |
+| **Database** | PostgreSQL + SQLAlchemy | ACID transactions, full-text search ready |
+| **Auth** | JWT + Argon2 (passlib) | Stateless, secure password hashing |
+| **Research** | Tavily API | Web search grounded in real results |
+| **Screenshots** | Playwright + Chromium | Headless browser, reliable homepage captures |
+| **LLM** | Groq (`gpt-oss-120b` / `gpt-oss-20b`) | Fast, structured output via Pydantic |
+| **Background Tasks** | Celery + Redis | Async memo generation, progress streaming |
+| **PDF Rendering** | Playwright (Chromium) | Renders HTML+SVG to A4 PDF |
+| **Frontend** | React 19 + Vite | Modern SPA, React Router, no build complexity |
+| **Design** | Plain CSS + design tokens | Dark/light theme, responsive down to 375px |
+| **Deployment** | Docker + Nginx | Containerized, load-balanced, easy to scale |
+
 ---
 
 ## Quick Start
 
-### 1. Install dependencies
+### Local Development (5 minutes)
+
+**Prerequisites:** Python 3.12+, Node 18+, PostgreSQL, Redis
+
+#### 1. Clone and install
 
 ```bash
+git clone https://github.com/yourusername/shipit.git
+cd shipit
+
+# Backend
 pip install -r Backend/requirements.txt
+
+# Frontend
+cd Frontend && npm install && cd ..
 ```
 
-### 2. Configure environment
+#### 2. Environment config
 
-Create `Backend/.env` with your keys (see variables below).
+Create `Backend/.env`:
 
 ```env
-DATABASE_URL="postgresql://user:pass@localhost:5432/shipit"
-GROQ_API_KEY="gsk_your_key"
-TAVILY_API_KEY="tvly-your_key"
-SECRET_KEY="your-jwt-secret"          # optional, defaults to "change-me"
-
-# Optional — deeper research (slow). Requires APIFY_API_KEY + VOICE_USE_APIFY=true
-APIFY_API_KEY="apify_api_your_key"
-VOICE_USE_APIFY="false"
-VOICE_COMPETITOR_LIMIT="3"
-TAVILY_VOICE_MAX_RESULTS="3"
+DATABASE_URL="postgresql://localhost:5432/shipit"
+GROQ_API_KEY="gsk_..."
+TAVILY_API_KEY="tvly_..."
+SECRET_KEY="dev-secret-change-in-prod"
 ```
 
-See [`Backend/FLOW.md`](Backend/FLOW.md) for a beginner-friendly walkthrough of every file and how data flows through the pipeline.
+#### 3. Run servers
 
-### 3. Run the server (local, no Docker)
-
-From the repo root:
-
+**Terminal 1: Backend**
 ```bash
-uvicorn Backend.main:app --reload
+cd Backend
+alembic upgrade head  # one-time: create schema
+uvicorn main:app --reload
 ```
 
-API docs: `http://localhost:8000/docs`
+**Terminal 2: Frontend**
+```bash
+cd Frontend
+npm run dev
+```
 
-### 3b. Run with Docker + Nginx (recommended for scaling)
+Visit `http://localhost:5173` → Sign up → Create a case → Answer 6 questions → Watch the memo generate.
 
-From the repo root:
+---
+
+### Production (Docker)
 
 ```bash
 docker compose up --build
 ```
 
-This will start:
+This starts:
+- **backend** (FastAPI on :8000)
+- **celery** (background worker for memo generation)
+- **db** (PostgreSQL)
+- **redis** (Celery broker)
+- **nginx** (reverse proxy on :80)
 
-- a `backend` FastAPI container on port 8000 (internal)
-- a `celery` worker container for background PDF generation
-- a `db` container (PostgreSQL)
-- a `redis` container (Celery broker + result backend)
-- an `nginx` reverse proxy on port 80
-
-The Nginx container routes `http://localhost/` → `backend`.
-
-To run multiple backend containers (horizontal scaling on one machine), use:
-
+To scale to 3 backend replicas:
 ```bash
 docker compose up --build --scale backend=3
 ```
 
-Docker will load-balance requests from Nginx across the `backend` replicas.
-
-### 4. Run database migrations (recommended)
-
-From `Backend/`:
-
-```bash
-cd Backend
-alembic upgrade head
-```
-
-For local dev only, you can skip Alembic and set `AUTO_CREATE_DB=true` in `.env` (default).
-
-### 5. Write an investor memo
-
-Run the frontend (`cd Frontend && npm install && npm run dev`) and use the app, or call the API.
-First sign up, log in, create a project and answer the six questions with `POST /api/query`
-until `fully_answered` is `true`. Then:
-
-```bash
-# Start the memo (returns a report id; runs on Celery when Redis is up, otherwise in a thread)
-curl -X POST http://localhost:8000/api/projects/1/reports -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-
-# Poll progress, then read the memo JSON when status is "success"
-curl http://localhost:8000/api/reports/REPORT_ID -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-
-# Download the PDF
-curl -o memo.pdf http://localhost:8000/api/reports/REPORT_ID/pdf -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-To iterate on the memo design without any LLM calls, render the bundled fixture:
-
-```bash
-cd Backend
-playwright install chromium          # once
-python scripts/render_sample_report.py --png   # → output/sample_report.pdf + output/sample_pages/*.png
-```
+Nginx automatically load-balances across them.
 
 ---
 
-## Stack
+## API Reference
 
-| Category | Technology | Why |
-|----------|-----------|-----|
-| Framework | **FastAPI** (Python) | Async API server with automatic OpenAPI docs and Pydantic integration |
-| Database | **PostgreSQL** + SQLAlchemy | Reliable relational storage for users and projects |
-| Auth | **JWT** + **Argon2** (passlib) | Secure token-based auth with modern password hashing |
-| LLM | **Groq** via LangChain | `gpt-oss-120b` and `gpt-oss-20b`; memo sections are split across both to stay inside per-model rate limits |
-| Search | **Tavily API** | Competitor discovery and per-competitor review/complaint research |
-| Scraping | **Apify** (optional) | Deep web scraping for richer customer sentiment data |
-| Templates | **Jinja2** | Server-side HTML for the investor memo |
-| PDF & capture | **Playwright (Chromium)** | Prints the HTML memo to PDF; captures competitor homepages |
-| Frontend | **React 19 + Vite**, React Router | Landing, case dashboard, workspace and interactive report |
-| Validation | **Pydantic v2** | Strict schema enforcement for all request/response models |
+### Authentication
+```bash
+POST /api/signup
+POST /api/login                    # returns JWT access_token
+```
 
----
+### Cases (Ideas)
+```bash
+GET  /api/projects                 # list all cases
+GET  /api/projects/{id}            # case detail + discovery state
+POST /api/projects/{id}/questions  # answer a question, get follow-ups
+```
 
-## Key Design Decisions
+### Reports (Memos)
+```bash
+POST /api/projects/{id}/reports    # start memo generation
+GET  /api/reports/{id}             # memo status & data (when ready)
+GET  /api/reports/{id}/pdf         # download PDF (authenticated)
+```
 
-**Gap-Driven Features** — `core_features` and `opportunities` in the teardown are explicitly tied to `CustomerVoiceAnalysis` market gaps and competitor complaints, not invented from the founder's idea alone.
-
-**Hybrid Customer Research** — Tavily runs for every competitor (fast, always-on). Apify deep-scrapes only the top 3 when configured, keeping cost and latency bounded.
-
-**Robust JSON Parsing** — Teardown generation uses explicit JSON prompts with a normalizer layer that coerces malformed LLM output (strings → lists, competitor fallbacks from market data) before Pydantic validation. This avoids brittle Groq tool-calling failures on complex nested schemas.
-
-**Two-Pass PDF Generation** — Content is rendered twice: first to build a table of contents, then again with the TOC inserted between the cover and content.
-
-**Evidence-Grounded Analysis** — Prompts forbid inventing facts. Competitors come from Tavily results; satisfaction signals require evidence from search/scrape data or are marked unknown.
-
-**Graceful Fallbacks** — Discovery falls back to keyword heuristics if the LLM parse fails. Teardown generation retries once on JSON parse failure.
+See `http://localhost:8000/docs` for the full OpenAPI spec.
 
 ---
 
 ## Project Structure
 
 ```
-Backend/
-├── main.py                         # FastAPI entrypoint — registers all routers
-├── alembic/                        # Database migrations (Alembic)
-│   └── versions/
-├── db.py                           # PostgreSQL connection, session factory, Base
-├── models/
-│   └── user.py                     # User & Project ORM models
-├── schemas/
-│   ├── auth.py                     # Signup/Login request schemas
-│   ├── query_schema.py             # Query request/response
-│   ├── teardown.py                 # ProductTeardown, CustomerVoiceAnalysis, MarketGap, etc.
-│   └── report.py                   # InvestorReport — the memo schema
-├── routes/
-│   ├── auth/auth.py                # /api/signup, /api/login with JWT + Argon2
-│   ├── query/
-│   │   ├── query.py                # Discovery pipeline — the core engine (Phases 1–4)
-│   │   └── tavily_sdk.py           # Tavily client test script
-│   ├── customer/
-│   │   ├── voice_analysis.py       # Phase 4: hybrid Tavily/Apify customer voice research
-│   │   └── behaviour.py            # Dev-only /behaviour/debug endpoint
-│   ├── research/
-│   │   ├── market_research.py      # Tavily searches + numbered SourceRegistry
-│   │   └── competitor_assets.py    # Logos (favicon service) + homepage screenshots
-│   ├── report/
-│   │   ├── router.py               # /api/projects, /api/reports endpoints
-│   │   ├── generator.py            # 4 section LLM calls + source validation → InvestorReport
-│   │   ├── prompts.py              # Section prompts
-│   │   ├── charts.py               # SVG charts (ring, TAM circles, positioning map, radar)
-│   │   ├── render.py               # HTML → PDF with Chromium (auto-fits each page)
-│   │   └── templates/              # report.html.j2 + report.css (12-page memo)
-│   └── teardown/                   # Legacy one-pager (no longer mounted in main.py)
-│       ├── template.py             # /teardown/ endpoints — orchestrates full pipeline
-│       ├── builder.py              # LLM teardown generation → ProductTeardown
-│       ├── normalizer.py           # JSON parse + coerce malformed LLM output
-│       ├── renderer.py             # ProductTeardown → Jinja2 Markdown
-│       ├── pdf_generator.py        # Markdown → professional PDF (fpdf2)
-│       ├── prompts.py              # LLM prompts for teardown generation
-│       ├── flow.md                 # Teardown content outline reference
-│       └── template/
-│           └── teardown.j2         # Jinja2 Markdown template
-└── output/                         # Generated PDF files land here
+shipit/
+├── Backend/
+│   ├── main.py                     # FastAPI app
+│   ├── db.py                       # PostgreSQL connection
+│   ├── models/
+│   │   └── user.py                 # User, Project, Report ORM models
+│   ├── schemas/
+│   │   ├── report.py               # InvestorReport Pydantic schema
+│   │   └── ...
+│   ├── routes/
+│   │   ├── auth/                   # /api/signup, /api/login
+│   │   ├── query/                  # Discovery pipeline
+│   │   ├── research/               # Market research, competitor assets
+│   │   └── report/                 # Memo generation, rendering, PDF
+│   │       ├── generator.py        # 4 parallel LLM section calls
+│   │       ├── charts.py           # SVG chart builders
+│   │       ├── render.py           # HTML→PDF via Chromium
+│   │       └── templates/
+│   │           ├── report.html.j2  # 12-page memo template
+│   │           └── report.css      # Print-optimized styles
+│   ├── alembic/                    # Database migrations
+│   ├── tasks.py                    # Celery background tasks
+│   ├── requirements.txt            # Python dependencies
+│   └── Dockerfile
+├── Frontend/
+│   ├── src/
+│   │   ├── App.jsx                 # Router & auth guard
+│   │   ├── api.js                  # HTTP client
+│   │   ├── format.js               # Formatting helpers
+│   │   ├── theme.js                # Dark/light mode
+│   │   ├── index.css               # Design tokens
+│   │   └── components/
+│   │       ├── Landing.jsx         # Hero + auth page
+│   │       ├── Dashboard.jsx       # Case grid
+│   │       ├── workspace/
+│   │       │   ├── Workspace.jsx   # 6 questions form
+│   │       │   └── ReportProgress.jsx
+│   │       └── report/             # 12-page report viewer
+│   │           ├── ReportView.jsx
+│   │           ├── sections.jsx
+│   │           └── charts.jsx
+│   ├── vite.config.js
+│   ├── package.json
+│   └── index.html
+├── docker-compose.yml
+└── README.md (this file)
 ```
 
 ---
 
-## API Endpoints
+## Key Features
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|:----:|-------------|
-| `POST` | `/api/signup` | ❌ | Create account (email, name, password) |
-| `POST` | `/api/login` | ❌ | Login → returns JWT access token |
-| `POST` | `/api/projects` | ✅ | Create a project → returns `project_id` |
-| `POST` | `/api/query` | ✅ | Run full discovery pipeline (Phases 1–4); persists state to project |
-| `GET` | `/api/query` | ✅ | Verify auth status |
-| `GET` | `/api/projects` | ✅ | List your cases with their latest memo |
-| `GET` | `/api/projects/{id}` | ✅ | One case: discovery state and memo history |
-| `POST` | `/api/projects/{id}/reports` | ✅ | Start writing the investor memo (202) |
-| `GET` | `/api/reports/{id}` | ✅ | Memo status, progress and, when done, the full memo JSON |
-| `GET` | `/api/reports/{id}/pdf` | ✅ | Download the memo PDF (owner only) |
-| `GET` | `/api/reports/{id}/media/{file}` | ❌ | Competitor logo/screenshot (the report id is the capability) |
-| `POST` | `/behaviour/debug` | ❌ | Dev-only: test customer voice for one competitor |
+### 🚀 Speed
+- Memo generation: 60–90 seconds
+- Live progress tracking (Celery PROGRESS meta)
+- Parallel research (4 LLM calls + Tavily searches simultaneously)
 
----
+### 📌 Sourced Data
+- Every number cites a web source
+- Unsourced figures show "Not found"
+- Source registry tracks 100+ research results per memo
 
-## Pipeline Flow
+### 🎨 Beautiful Output
+- 12-page A4 PDF with custom fonts (Inter, Fraunces)
+- SVG charts with hover tooltips
+- Dark/light theme, mobile-responsive
+- Print-optimized CSS (paged media, headers/footers)
 
-```
-User submits idea
-       │
-       ▼
-┌─────────────────────────┐
-│  Phase 1: Discovery     │
-│  LLM checks 6 questions │──────── If incomplete → return follow-up questions
-└─────────┬───────────────┘
-          │ (all 6 answered)
-          ▼
-┌─────────────────────────┐
-│  Phase 2: Product       │
-│  Context Generation     │
-└─────────┬───────────────┘
-          │
-          ▼
-┌─────────────────────────┐
-│  Phase 3: Market Intel  │
-│  Tavily + LLM           │
-│  → named competitors    │
-└─────────┬───────────────┘
-          │
-          ▼
-┌─────────────────────────┐
-│  Phase 4: Customer      │
-│  Voice & Gap Analysis   │
-│  Tavily per competitor  │
-│  + Apify (optional)     │
-│  → gaps & features      │
-└─────────┬───────────────┘
-          │
-          ▼
-┌─────────────────────────┐
-│  Memo research          │
-│  market size, pricing,  │
-│  funding → numbered     │
-│  sources, logos, shots  │
-└─────────┬───────────────┘
-          │
-          ▼
-┌─────────────────────────┐
-│  Memo writing           │
-│  4 section LLM calls →  │
-│  InvestorReport; drop   │
-│  unsourced numbers      │
-└─────────┬───────────────┘
-          │
-          ▼
-┌─────────────────────────┐
-│  Rendering              │
-│  Jinja2 + SVG → HTML    │
-│  Chromium → 12-page PDF │
-│  + interactive web view │
-└─────────────────────────┘
-```
+### 🔒 Secure
+- JWT authentication
+- Password hashing (Argon2)
+- Report access gated by project ownership
+- Images served from an authenticated asset store
+
+### 🌐 Scalable
+- Stateless API (horizontal scaling)
+- Background tasks on Celery + Redis
+- Database migrations with Alembic
+- Docker Compose for easy orchestration
 
 ---
 
-## Investor Memo Pages
+## Development
 
-1. **Executive one-pager** — verdict, readiness score, TAM, growth, why invest, key risks
-2. **Problem & customer** — pains with severity and real user quotes, segments, why now
-3. **Value proposition** — Strategyzer canvas with pain → reliever and gain → creator fit map, before/after, user journey
-4. **Market** — TAM/SAM/SOM with method, confidence and sources; CAGR; sizing logic; trends
-5. **Competitive landscape** — homepage screenshot, logo, founded, HQ, funding, pricing, satisfaction, top complaint
-6. **Head-to-head** — feature matrix, positioning map with a reason for every placement, why we win
-7. **Voice of the customer** — sentiment per competitor, complaint themes, gaps → our angle
-8. **Business model & GTM** — pricing tiers vs competitor pricing, unit-economics assumptions, channels
-9. **Risks & moats** — likelihood × impact heatmap with mitigations, moat strength, opportunities
-10. **Verdict** — five-part scorecard radar, reasoning, bottom line
-11. **Next 90 days** — milestones with metrics and targets, investor Q&A
-12. **Sources** — every page read, cited ones highlighted
-
----
-
-## Database Notes
-
-**Alembic migrations** (from `Backend/`):
+### Running Tests
 
 ```bash
-alembic upgrade head    # apply migrations
-alembic revision --autogenerate -m "describe change"  # after model changes
+# Backend
+cd Backend
+pytest
+
+# Frontend
+cd Frontend
+npm run test
 ```
 
-Set `AUTO_CREATE_DB=false` in production and use Alembic only.
+### Rebuilding the Memo Design (No LLM Calls)
 
-If upgrading an old database without Alembic history:
+Use the sample report fixture to iterate on PDF styles without burning LLM tokens:
 
-```sql
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS customer_voice JSON;
+```bash
+cd Backend
+python scripts/render_sample_report.py --png
+# → generates output/sample_report.pdf + output/sample_pages/*.png
+```
+
+### Database Migrations
+
+After editing `Backend/models/user.py`:
+
+```bash
+cd Backend
+alembic revision --autogenerate -m "describe your change"
+alembic upgrade head
+```
+
+### Linting & Building
+
+```bash
+# Backend
+cd Backend && ../.venv/Scripts/python -m flake8
+
+# Frontend
+cd Frontend && npx eslint src && npm run build
 ```
 
 ---
 
-## Example Use Case
+## Environment Variables
 
-**Input:** *"AI mock interview platform for college placements"*
+### Required
+- `DATABASE_URL` — PostgreSQL connection string
+- `GROQ_API_KEY` — Groq API key (get from https://console.groq.com)
+- `TAVILY_API_KEY` — Tavily search API (get from https://tavily.com)
 
-**Pipeline output:**
-- **Competitors:** Pramp, InterviewBit, LeetCode (from Tavily)
-- **Customer voice:** "Pramp users complain about limited question variety" / "InterviewBit feels too DSA-heavy for behavioral rounds"
-- **Gap:** No tool combines AI behavioral mock interviews tailored to Indian campus placement formats
-- **Feature:** Campus-specific behavioral AI interviewer with company-wise question banks
-- **PDF:** Full investor teardown with gap evidence and positioning
+### Optional
+- `SECRET_KEY` — JWT signing secret (default: "change-me", set to random in production)
+- `APIFY_API_KEY` — For deeper web scraping (off by default)
+- `VOICE_USE_APIFY` — Enable Apify scraping (default: "false")
+- `VOICE_COMPETITOR_LIMIT` — Max competitors to deep-research (default: "3")
+- `TAVILY_VOICE_MAX_RESULTS` — Max Tavily results per search (default: "3")
+- `AUTO_CREATE_DB` — Auto-create schema on startup (default: "true", disable in production)
+
+### Groq Rate Limits
+
+Your key may have limits. ShipIt handles this:
+- Per-model rate-limit locks (separate queues for `gpt-oss-120b` and `gpt-oss-20b`)
+- Automatic exponential backoff on 429 errors
+- Prompt size capping (max ~4.5K tokens per call)
+
+---
+
+## Deployment Notes
+
+### Database
+- Use Alembic migrations (versioned schema changes)
+- Set `AUTO_CREATE_DB=false` in production
+- PostgreSQL 13+ recommended
+
+### Redis
+- Required for Celery (background memo generation)
+- In production, use a managed Redis (AWS ElastiCache, etc.)
+- Single-node setup fine for <10 concurrent memo generations
+
+### Chromium
+- Installed automatically in the Docker image
+- Requires `playwright install --with-deps chromium` in Dockerfile
+- Headless, uses system fonts (Inter + Fraunces bundled in assets/)
+
+### SSL/TLS
+- Nginx handles HTTPS (configure cert in `deploy/nginx.conf`)
+- Behind a load balancer? Set `X-Forwarded-Proto: https` headers
+
+---
+
+## Troubleshooting
+
+### "Not found" market size
+The LLM couldn't find sourced data for that market category. Try:
+- Refine the product description (add industry, geography)
+- Check Tavily results manually: `https://tavily.com/search?q=your+market`
+
+### Memo generation timeout
+Check:
+- Redis is running: `redis-cli ping` → should return `PONG`
+- Celery worker is running: check Docker logs or `celery -A celery_app worker --loglevel=info`
+- Database isn't locked: `psql shipit -c "SELECT * FROM reports WHERE status='running'"`
+
+### PDF rendering errors
+- Chromium may be missing fonts: verify `Backend/assets/fonts/` exists
+- Large competitor datasets: reduce `VOICE_COMPETITOR_LIMIT` in `.env`
+
+---
+
+## Contributing
+
+Contributions welcome! Before submitting a PR:
+
+1. Create a feature branch: `git checkout -b feature/your-idea`
+2. Make changes and test locally
+3. Run linters: `pylint Backend/ && npx eslint Frontend/src/`
+4. Commit with a clear message
+5. Push and open a pull request
+
+Areas we'd love help with:
+- More chart types (sensitivity analysis, revenue model visuals)
+- Custom report templates (one-pager, pitch deck PDF)
+- Mobile app (React Native)
+- Improved positioning map axes (currently LLM-chosen)
 
 ---
 
 ## License
 
-MIT (or add your license here)
+MIT License — see LICENSE file for details.
+
+---
+
+## Acknowledgments
+
+- **Groq** — Fast LLM inference
+- **Tavily** — Web search API
+- **Playwright** — Browser automation & PDF rendering
+- **FastAPI** — Modern Python web framework
+- **React** — UI library
+
+---
+
+## Documentation
+
+- **[Quick Start Workflows](docs/QUICKSTART.md)** — 11 step-by-step guides (generate a memo, compare ideas, iterate, debug, etc.)
+- **[Screenshots & Page Guide](docs/SCREENSHOTS.md)** — Visual walkthrough of all 12 memo pages and interactive features
+- **[Backend/FLOW.md](Backend/FLOW.md)** — Deep dive into the research pipeline architecture
+
+---
+
+## Questions?
+
+- 📖 Check [docs/QUICKSTART.md](docs/QUICKSTART.md) for common workflows
+- 🐛 File an issue on GitHub for bugs
+- 💬 Check the discussions tab for feature requests
+- 🏗️ See [Backend/FLOW.md](Backend/FLOW.md) for technical deep-dives
+
+**Made with 🚀 by [Your Team]**
